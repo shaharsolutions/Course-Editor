@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>עריכת לומדות - שחר פתרונות דיגיטליים</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div id="editor-container">
+        <!-- Sidebar: Course Selection & Slides List -->
+        <aside id="sidebar">
+            <header>
+                <h1>ניהול לומדות</h1>
+                <select id="course-selector">
+                    <option value="">בחר לומדה...</option>
+                </select>
+            </header>
+            <div id="slides-list-container">
+                <ul id="slides-list">
+                    <!-- Slides will be listed here -->
+                </ul>
+            </div>
+            <button id="add-slide-btn" class="secondary-btn"><i class="fas fa-plus"></i> הוסף שקף</button>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main id="workspace">
+            <div id="no-selection" class="empty-state">
+                <i class="fas fa-edit"></i>
+                <p>בחר שקף מהרשימה כדי להתחיל לערוך</p>
+            </div>
+
+            <div id="editor-form" class="hidden">
+                <header class="workspace-header">
+                    <h2 id="current-slide-id-display">עריכת שקף</h2>
+                    <div class="actions">
+                        <button id="preview-btn" class="secondary-btn-outline"><i class="fas fa-play"></i> תצוגה מקדימה של השקף</button>
+                        <button id="preview-course-btn" class="secondary-btn-outline"><i class="fas fa-external-link-alt"></i> תצוגה מקדימה של הלומדה</button>
+                        <button id="export-btn" class="secondary-btn-outline"><i class="fas fa-file-archive"></i> ייצוא ל-SCORM</button>
+                        <button id="save-btn" class="primary-btn">שמור שינויים</button>
+                    </div>
+                </header>
+
+                <div class="form-grid">
+                    <!-- Left: Basic Fields -->
+                    <div class="field-column">
+                        <div class="form-group">
+                            <label>כותרת השקף</label>
+                            <input type="text" id="slide-title" placeholder="לדוגמה: מבוא ללומדה">
+                        </div>
+
+                        <div class="form-group">
+                            <label>תוכן השקף</label>
+                            <textarea id="slide-content" rows="6" placeholder="הכנס את תוכן השקף..."></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>תמונת רקע (assets/...)</label>
+                            <input type="text" id="slide-bg" placeholder="לדוגמה: assets/scene_welcome.png">
+                        </div>
+                    </div>
+
+                    <!-- Right: Advanced Features -->
+                    <div class="field-column">
+                        <div class="feature-card glass">
+                            <h3><i class="fas fa-microphone"></i> קריינות וזמן</h3>
+                            
+                            <div class="form-group">
+                                <label>קובץ קריינות (MP3/WAV)</label>
+                                <div class="upload-wrapper">
+                                    <input type="file" id="audio-upload" accept="audio/*" class="hidden">
+                                    <button type="button" class="upload-btn" onclick="document.getElementById('audio-upload').click()">
+                                        <i class="fas fa-cloud-upload-alt"></i> בחר קובץ
+                                    </button>
+                                    <span id="audio-filename" class="filename-display">לא נבחר קובץ</span>
+                                </div>
+                                <input type="hidden" id="audio-path">
+                            </div>
+
+                            <div class="form-group inline-group">
+                                <label class="switch">
+                                    <input type="checkbox" id="wait-for-audio">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span>חכה לסיום הקריינות לפני המשך</span>
+                            </div>
+
+                            <div class="form-group">
+                                <label>זמן השהייה מינימלי (שניות)</label>
+                                <input type="number" id="min-delay" min="0" value="0">
+                            </div>
+                        </div>
+
+                        <div class="feature-card glass">
+                            <h3><i class="fas fa-question-circle"></i> הגדרות שאלה</h3>
+                            <div class="form-group inline-group">
+                                <label class="switch">
+                                    <input type="checkbox" id="is-question" onchange="toggleQuestionFields()">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span>שקף שאלה</span>
+                            </div>
+
+                            <div id="question-fields" class="hidden">
+                                <div class="form-group">
+                                    <label>טקסט השאלה</label>
+                                    <input type="text" id="question-text">
+                                </div>
+                                <!-- Options structure can be expanded -->
+                                <p class="note">אפשרויות התשובה נערכות כרגע ישירות ב-JSON (בקרוב בממשק)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="preview-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <div id="preview-frame" class="preview-container">
+                <!-- Preview content will be injected here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="hidden"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
