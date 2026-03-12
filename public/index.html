@@ -18,6 +18,23 @@
                     <option value="">בחר לומדה...</option>
                 </select>
             </header>
+            <div id="sidebar-header-actions">
+                <label class="select-all-label">
+                    <input type="checkbox" id="select-all-slides"> בחר הכל
+                </label>
+            </div>
+            
+            <div id="bulk-actions" class="hidden glass">
+                <h4><i class="fas fa-layer-group"></i> עריכה קבוצתית</h4>
+                <div class="form-group">
+                    <label>זמן השהייה (שניות)</label>
+                    <div class="bulk-input-group">
+                        <input type="number" id="bulk-min-delay" min="0" value="0">
+                        <button id="apply-bulk-delay" class="primary-btn small-btn">החל</button>
+                    </div>
+                </div>
+            </div>
+
             <div id="slides-list-container">
                 <ul id="slides-list">
                     <!-- Slides will be listed here -->
@@ -110,7 +127,20 @@
                                     <input type="text" id="question-text">
                                 </div>
                                 <!-- Options structure can be expanded -->
-                                <p class="note">אפשרויות התשובה נערכות כרגע ישירות ב-JSON (בקרוב בממשק)</p>
+                                <div class="form-group">
+                                    <label>משוב לאחר תשובה</label>
+                                    <textarea id="question-feedback" rows="2" placeholder="הכנס את המשוב שיופיע לאחר המענה..."></textarea>
+                                </div>
+
+                                <div class="options-section">
+                                    <label>אפשרויות תשובה</label>
+                                    <div id="options-container">
+                                        <!-- Options will be dynamic -->
+                                    </div>
+                                    <button type="button" id="add-option-btn" class="secondary-btn-outline small-btn">
+                                        <i class="fas fa-plus"></i> הוסף אפשרות
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

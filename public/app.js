@@ -2,6 +2,7 @@ const API_BASE = 'http://localhost:3030/api';
 let currentCourse = null;
 let currentCourseData = { screens: [] };
 let selectedSlideIndex = -1;
+let selectedSlidesIndices = new Set();
 
 // --- Elements ---
 const courseSelector = document.getElementById('course-selector');
@@ -11,6 +12,10 @@ const noSelection = document.getElementById('no-selection');
 const saveBtn = document.getElementById('save-btn');
 const previewCourseBtn = document.getElementById('preview-course-btn');
 const toast = document.getElementById('toast');
+const selectAllSlides = document.getElementById('select-all-slides');
+const bulkActions = document.getElementById('bulk-actions');
+const bulkMinDelay = document.getElementById('bulk-min-delay');
+const applyBulkDelayBtn = document.getElementById('apply-bulk-delay');
 
 // Form Fields
 const slideTitle = document.getElementById('slide-title');
@@ -24,6 +29,9 @@ const minDelay = document.getElementById('min-delay');
 const isQuestion = document.getElementById('is-question');
 const questionText = document.getElementById('question-text');
 const questionFields = document.getElementById('question-fields');
+const questionFeedback = document.getElementById('question-feedback');
+const optionsContainer = document.getElementById('options-container');
+const addOptionBtn = document.getElementById('add-option-btn');
 
 // --- Initialization ---
 async function init() {
@@ -51,6 +59,7 @@ courseSelector.addEventListener('change', async (e) => {
     }
     
     currentCourse = courseId;
+    selectedSlidesIndices.clear();
     loadCourse(courseId);
 });
 
@@ -87,9 +96,24 @@ function renderSlidesList(screens) {
     screens.forEach((screen, index) => {
         const li = document.createElement('li');
         
+        const leftSide = document.createElement('div');
+        leftSide.className = 'slide-item-left';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'slide-checkbox';
+        checkbox.checked = selectedSlidesIndices.has(index);
+        checkbox.onclick = (e) => {
+            e.stopPropagation();
+            toggleSlideSelection(index);
+        };
+        leftSide.appendChild(checkbox);
+
         const titleSpan = document.createElement('span');
         titleSpan.textContent = `${index + 1}. ${screen.title || 'שקף ללא כותרת'}`;
-        li.appendChild(titleSpan);
+        leftSide.appendChild(titleSpan);
+        
+        li.appendChild(leftSide);
         
         const deleteBtn = document.createElement('button');
         deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
@@ -104,12 +128,89 @@ function renderSlidesList(screens) {
         if (selectedSlideIndex === index) li.classList.add('active');
         slidesList.appendChild(li);
     });
+    
+    updateBulkActionsVisibility();
+    updateSelectAllCheckboxState();
 }
+
+function toggleSlideSelection(index) {
+    if (selectedSlidesIndices.has(index)) {
+        selectedSlidesIndices.delete(index);
+    } else {
+        selectedSlidesIndices.add(index);
+    }
+    updateBulkActionsVisibility();
+    updateSelectAllCheckboxState();
+}
+
+function updateBulkActionsVisibility() {
+    if (selectedSlidesIndices.size > 1) {
+        bulkActions.classList.remove('hidden');
+    } else {
+        bulkActions.classList.add('hidden');
+    }
+}
+
+function updateSelectAllCheckboxState() {
+    if (currentCourseData.screens.length === 0) {
+        selectAllSlides.checked = false;
+        selectAllSlides.indeterminate = false;
+        return;
+    }
+    
+    const allSelected = selectedSlidesIndices.size === currentCourseData.screens.length;
+    const noneSelected = selectedSlidesIndices.size === 0;
+    
+    selectAllSlides.checked = allSelected;
+    selectAllSlides.indeterminate = !allSelected && !noneSelected;
+}
+
+selectAllSlides.onchange = (e) => {
+    if (e.target.checked) {
+        currentCourseData.screens.forEach((_, index) => selectedSlidesIndices.add(index));
+    } else {
+        selectedSlidesIndices.clear();
+    }
+    renderSlidesList(currentCourseData.screens);
+};
+
+applyBulkDelayBtn.onclick = async () => {
+    const delay = parseInt(bulkMinDelay.value) || 0;
+    if (selectedSlidesIndices.size === 0) return;
+    
+    selectedSlidesIndices.forEach(index => {
+        if (currentCourseData.screens[index]) {
+            currentCourseData.screens[index].minDelay = delay;
+        }
+    });
+    
+    showToast(`זמן השהייה עודכן ל-${delay} שניות עבור ${selectedSlidesIndices.size} שקפים`);
+    
+    // If one of the selected slides is the currently edited one, update the form
+    if (selectedSlidesIndices.has(selectedSlideIndex)) {
+        minDelay.value = delay;
+    }
+    
+    await saveCourse();
+};
 
 async function deleteSlide(index) {
     if (!confirm('האם אתה בטוח שברצונך למחוק את השקף?')) return;
     
     currentCourseData.screens.splice(index, 1);
+    
+    // Remove from selection if it was selected
+    if (selectedSlidesIndices.has(index)) {
+        selectedSlidesIndices.delete(index);
+    }
+    
+    // Shift indices of selected slides that come after the deleted one
+    const newSelected = new Set();
+    selectedSlidesIndices.forEach(idx => {
+        if (idx < index) newSelected.add(idx);
+        else if (idx > index) newSelected.add(idx - 1);
+    });
+    selectedSlidesIndices = newSelected;
     
     // Save to server
     await saveCourse();
@@ -159,8 +260,61 @@ function selectSlide(index) {
     // Question
     isQuestion.checked = !!screen.question;
     questionText.value = screen.question ? screen.question.text : '';
+    questionFeedback.value = (screen.question && screen.question.feedback) ? screen.question.feedback : '';
+    renderOptions(screen.question ? screen.question.options : []);
     toggleQuestionFields();
 }
+
+function renderOptions(options = []) {
+    optionsContainer.innerHTML = '';
+    
+    // Fallback if options is not an array (e.g. from older data)
+    if (!Array.isArray(options)) options = [];
+    
+    options.forEach((opt, idx) => {
+        const optionDiv = document.createElement('div');
+        optionDiv.className = 'option-item';
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = opt.text || '';
+        input.placeholder = `אפשרות ${idx + 1}`;
+        input.oninput = (e) => { opt.text = e.target.value; };
+        
+        const label = document.createElement('label');
+        label.className = `correct-toggle ${opt.correct ? 'is-correct' : ''}`;
+        label.innerHTML = `<input type="checkbox" ${opt.correct ? 'checked' : ''}> נכון`;
+        label.querySelector('input').onchange = (e) => {
+            opt.correct = e.target.checked;
+            label.classList.toggle('is-correct', opt.correct);
+        };
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.innerHTML = '<i class="fas fa-times"></i>';
+        deleteBtn.className = 'remove-option-btn';
+        deleteBtn.onclick = () => {
+            const screen = currentCourseData.screens[selectedSlideIndex];
+            if (screen.question && screen.question.options) {
+                screen.question.options.splice(idx, 1);
+                renderOptions(screen.question.options);
+            }
+        };
+        
+        optionDiv.appendChild(input);
+        optionDiv.appendChild(label);
+        optionDiv.appendChild(deleteBtn);
+        optionsContainer.appendChild(optionDiv);
+    });
+}
+
+addOptionBtn.onclick = () => {
+    if (selectedSlideIndex === -1) return;
+    const screen = currentCourseData.screens[selectedSlideIndex];
+    screen.question = screen.question || { text: '', options: [], feedback: '' };
+    screen.question.options = screen.question.options || [];
+    screen.question.options.push({ text: '', correct: false });
+    renderOptions(screen.question.options);
+};
 
 function toggleQuestionFields() {
     if (isQuestion.checked) {
@@ -184,6 +338,8 @@ function updateCurrentSlideData() {
     if (isQuestion.checked) {
         screen.question = screen.question || { text: '', options: [], feedback: '' };
         screen.question.text = questionText.value;
+        screen.question.feedback = questionFeedback.value;
+        // options are updated in-place during input
     } else {
         delete screen.question;
     }
@@ -262,9 +418,17 @@ document.getElementById('preview-btn').onclick = () => {
     const bgUrl = bg ? (bg.startsWith('http') ? bg : baseUrl + bg) : '';
     const audioUrl = audio ? (audio.startsWith('http') ? audio : baseUrl + audio) : '';
     
-    const characterImg = courseId.toLowerCase().includes('infosec') ? 'maya_guide.png' : 'mia.png';
-    const characterLabel = courseId.toLowerCase().includes('infosec') ? 'מיה - הממונה על אבטחת מידע' : 'מיה - המלווה שלכם';
-    
+    const characterImg = courseId.toLowerCase().includes('infosec') ? 'maya_guide.png' : 'mia_transparent_v4.png';
+    const characterLabel = courseId.toLowerCase().includes('infosec') ? 'מיה - הממונה על אבטחת מידע' : 'מונה - הממונה על מניעת הטרדה מינית';
+    const screenData = currentCourseData.screens[selectedSlideIndex];
+    const isQ = isQuestion.checked;
+    const qText = questionText.value;
+    const optionsHtml = (isQ && screenData.question && screenData.question.options) 
+        ? `<div class="mockup-options">
+            ${screenData.question.options.map(opt => `<div class="mockup-option">${opt.text || 'אפשרות ריקה'}</div>`).join('')}
+          </div>` 
+        : '';
+
     // Inject HTML
     previewFrame.innerHTML = `
         <div class="course-mockup" style="background-image: url('${bgUrl}')">
@@ -272,13 +436,14 @@ document.getElementById('preview-btn').onclick = () => {
             <div class="mockup-progress-container"><div class="mockup-progress-bar"></div></div>
             <div class="content-area-mockup">
                 <div class="screen active">
-                    <h1>${title}</h1>
-                    <p>${content}</p>
+                    <h1>${isQ ? qText : title}</h1>
+                    <p>${isQ ? '' : content}</p>
+                    ${optionsHtml}
                 </div>
             </div>
-            <div class="mockup-nav"><button class="mockup-btn">המשך</button></div>
+            <div class="mockup-nav"><button class="mockup-btn">${isQ ? 'בדוק תשובה' : 'המשך'}</button></div>
             <div class="mockup-character">
-                <div class="mockup-avatar" style="background-image: url('${baseUrl}assets/${characterImg}')"></div>
+                <img src="${baseUrl}assets/${characterImg}" class="mockup-character-img">
                 <div class="mockup-label">${characterLabel}</div>
             </div>
         </div>
