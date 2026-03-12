@@ -553,11 +553,16 @@ document.getElementById('preview-btn').onclick = () => {
         : '';
 
     // Inject HTML
-    // Use a more robust check for character based on course name or ID
-    const courseTitle = courseSelector.options[courseSelector.selectedIndex].text;
-    const isInfoSec = (courseTitle.includes('אבטחת מידע') || courseId.toLowerCase().includes('infosec'));
+    // Refined character detection
+    const courseTitle = courseSelector.options[courseSelector.selectedIndex].text.toLowerCase();
+    const isSexualHarassment = courseTitle.includes('הטרדה') || courseTitle.includes('מינית') || courseId.toLowerCase().includes('harass');
+    const isInfoSec = courseTitle.includes('אבטחת') || courseTitle.includes('מידע') || courseTitle.includes('פרטיות') || courseId.toLowerCase().includes('infosec');
+    
+    // Default to Monica (Mona) if not specified, but prefer Maya for Infosec
     const charImg = isInfoSec ? 'maya_guide.png' : 'mia_transparent_v4.png';
-    const charLabel = isInfoSec ? 'מיה - הממונה על אבטחת מידע' : 'מונה - הממונה על מניעת הטרדה מינית';
+    const charLabel = isSexualHarassment 
+        ? 'מונה - הממונה על מניעת הטרדה מינית' 
+        : (isInfoSec ? 'מיה - הממונה על אבטחת מידע' : 'מיה - המדריכה שלך');
 
     previewFrame.innerHTML = `
         <div class="course-mockup" style="background-image: url('${bgUrl}')">
@@ -585,7 +590,7 @@ document.getElementById('preview-btn').onclick = () => {
     `;
     
     // Play Audio
-    if (audioUrl) {
+    if (audioUrl && audioUrl !== storageUrl) {
         if (previewAudio) previewAudio.pause();
         previewAudio = new Audio(audioUrl);
         previewAudio.play().catch(e => console.log('Audio play failed:', e));
