@@ -37,9 +37,21 @@ const courseFileInput = document.getElementById('course-file-input');
 
 // --- Initialization ---
 async function init() {
+    console.log('[App] Initializing Course Editor...');
+    console.log('[App] API_BASE:', API_BASE);
+
     try {
         const response = await fetch(`${API_BASE}/courses`);
+        
+        if (!response.ok) {
+            const errData = await response.json();
+            console.error('[App] Server Error:', errData);
+            showToast(`שגיאת שרת: ${errData.error || response.statusText}`, 'error');
+            return;
+        }
+
         const courses = await response.json();
+        console.log('[App] Courses loaded:', courses.length);
         
         // Clear existing options except the first one
         while (courseSelector.options.length > 1) {
@@ -53,7 +65,8 @@ async function init() {
             courseSelector.appendChild(option);
         });
     } catch (err) {
-        showToast('נכשל בטעינת רשימת הלומדות', 'error');
+        console.error('[App] Connection Error:', err);
+        showToast('לא ניתן להתחבר לשרת. בדוק את משתני הסביבה ב-Vercel.', 'error');
     }
 }
 

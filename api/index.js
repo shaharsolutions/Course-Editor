@@ -1,187 +1,193 @@
 require('dotenv').config();
 const express = require('express');
-const fs = require('fs-extra');
-const path = require('path');
-const multer = require('multer');
 const cors = require('cors');
-const archiver = require('archiver');
-const AdmZip = require('adm-zip');
+const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
+const AdmZip = require('adm-zip');
+const archiver = require('archiver');
+const path = require('path');
+const fs = require('fs-extra');
 const os = require('os');
 
 const app = express();
 const PORT = process.env.PORT || 3030;
 
-// Initialize Supabase
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
-    console.error('CRITICAL: Missing Supabase environment variables!');
+// Initialize Supabase - Using defensive check
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+
+let supabase = null;
+if (supabaseUrl && supabaseKey) {
+    try {
+        supabase = createClient(supabaseUrl, supabaseKey);
+        console.log('[Supabase] Client initialized');
+    } catch (e) {
+        console.error('[Supabase] Failed to initialize client:', e.message);
+    }
+} else {
+    console.error('[Supabase] Missing credentials in environment variables');
 }
 
-const supabase = createClient(
-    process.env.SUPABASE_URL || 'https://placeholder.supabase.co',
-    process.env.SUPABASE_ANON_KEY || 'placeholder'
-);
-
-// We'll use /tmp for all temporary operations (Vercel friendly)
-const TEMP_DIR = os.tmpdir();
-const UPLOADS_DIR = path.join(TEMP_DIR, 'lms-uploads');
-fs.ensureDirSync(UPLOADS_DIR);
+// Multer in-memory storage for Vercel
+const storage = multer.memoryStorage();
+const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
+});
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Configure storage for audio files (Local temp before Supabase upload)
-const audioStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const dest = path.join(TEMP_DIR, 'audio-temp');
-        fs.ensureDirSync(dest);
-        cb(null, dest);
-    },
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname) || '.wav';
-        const safeName = `audio_${Date.now()}${ext}`;
-        cb(null, safeName);
-    }
+// Global log middleware for Vercel debugging
+app.use((req, res, next) => {
+    console.log(`[Request] ${req.method} ${req.url}`);
+    next();
 });
-const uploadAudioMulter = multer({ storage: audioStorage });
+
+// Health / Diagnostics
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'ok', 
+        supabaseConfigured: !!supabase,
+        hasUrl: !!supabaseUrl,
+        hasKey: !!supabaseKey,
+        nodeEnv: process.env.NODE_ENV,
+        timestamp: new Date().toISOString()
+    });
+});
 
 // API: List courses
 app.get('/api/courses', async (req, res) => {
     try {
+        if (!supabase) {
+            return res.status(503).json({ error: 'Supabase is not configured. Check environment variables in Vercel.' });
+        }
+
         const { data, error } = await supabase
             .from('courses')
             .select('id, name')
             .order('created_at', { ascending: false });
             
         if (error) {
-            console.error('Supabase error fetching courses:', error);
-            return res.status(500).json({ 
-                error: 'שגיאה בגישה לבסיס הנתונים. וודא שהגדרת את הטבלה לפי ההוראות.',
-                details: error.message 
-            });
+            console.error('[Supabase Error]', error);
+            return res.status(500).json({ error: 'Database error', details: error.message });
         }
         res.json(data || []);
     } catch (err) {
-        console.error('Server error:', err);
+        console.error('[Internal Error]', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Configure storage for ZIP uploads
-const zipUpload = multer({ dest: UPLOADS_DIR });
-
-// Helper: Recursively upload folder to Supabase Storage
-async function uploadFolderToSupabase(localPath, supabaseBasePath) {
-    const entries = await fs.readdir(localPath, { withFileTypes: true });
-    
-    for (const entry of entries) {
-        const fullLocalPath = path.join(localPath, entry.name);
-        const supabasePath = `${supabaseBasePath}/${entry.name}`;
-        
-        if (entry.isDirectory()) {
-            await uploadFolderToSupabase(fullLocalPath, supabasePath);
-        } else {
-            const fileBuffer = await fs.readFile(fullLocalPath);
-            const { error } = await supabase.storage
-                .from('course-assets')
-                .upload(supabasePath, fileBuffer, {
-                    upsert: true,
-                    contentType: getContentType(entry.name)
-                });
-            if (error) console.error(`Error uploading ${supabasePath}:`, error);
-        }
-    }
-}
-
+// Helper: Get Content Type
 function getContentType(filename) {
     const ext = path.extname(filename).toLowerCase();
     const mimes = {
-        '.html': 'text/html',
-        '.js': 'application/javascript',
-        '.css': 'text/css',
-        '.json': 'application/json',
-        '.png': 'image/png',
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.gif': 'image/gif',
-        '.svg': 'image/svg+xml',
-        '.mp3': 'audio/mpeg',
-        '.wav': 'audio/wav'
+        '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
+        '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.svg': 'image/svg+xml',
+        '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.xml': 'text/xml', '.mp4': 'video/mp4'
     };
     return mimes[ext] || 'application/octet-stream';
 }
 
-// API: Upload course ZIP
-app.post('/api/courses/upload', zipUpload.single('courseZip'), async (req, res) => {
-    let targetPath = '';
-    try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
-        }
+// Helper: Recursively find files
+async function getFilesRecursive(dir) {
+    const dirents = await fs.readdir(dir, { withFileTypes: true });
+    const files = await Promise.all(dirents.map((dirent) => {
+        const res = path.resolve(dir, dirent.name);
+        return dirent.isDirectory() ? getFilesRecursive(res) : res;
+    }));
+    return Array.prototype.concat(...files);
+}
 
-        const zip = new AdmZip(req.file.path);
+// API: Upload course ZIP
+app.post('/api/courses/upload', upload.single('courseZip'), async (req, res) => {
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    
+    const tempDir = path.join(os.tmpdir(), `course_${Date.now()}`);
+    
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        
+        console.log(`[Upload] Processing ZIP: ${req.file.originalname}`);
+        
+        const zip = new AdmZip(req.file.buffer);
         const baseName = path.parse(req.file.originalname).name.replace(/[^a-z0-9_\-\u0590-\u05FF]/gi, '_');
         const courseId = `${baseName}_${Date.now()}`;
-        targetPath = path.join(TEMP_DIR, courseId);
         
-        // Extract directly to temp folder
-        zip.extractAllTo(targetPath, true);
+        await fs.ensureDir(tempDir);
+        zip.extractAllTo(tempDir, true);
         
-        // Check for nested structure and flatten if needed
-        let pathToUpload = targetPath;
-        const entries = await fs.readdir(targetPath);
-        if (entries.length === 1 && (await fs.stat(path.join(targetPath, entries[0]))).isDirectory()) {
-            pathToUpload = path.join(targetPath, entries[0]);
+        // Flatten nested folder if exists
+        let pathToUpload = tempDir;
+        const entries = await fs.readdir(tempDir);
+        const subdirs = entries.filter(e => fs.statSync(path.join(tempDir, e)).isDirectory());
+        
+        // If there's only one folder and no files at root, use that folder
+        const filesAtRoot = entries.filter(e => !fs.statSync(path.join(tempDir, e)).isDirectory());
+        if (subdirs.length === 1 && filesAtRoot.length === 0) {
+            pathToUpload = path.join(tempDir, subdirs[0]);
         }
 
-        // 1. Upload assets to Supabase Storage
-        console.log(`[Supabase] Uploading assets for ${courseId}...`);
-        await uploadFolderToSupabase(pathToUpload, courseId);
+        // Upload files to Supabase Storage
+        const files = await getFilesRecursive(pathToUpload);
+        console.log(`[Upload] Uploading ${files.length} files to Storage...`);
+        
+        // Upload in parallel with a limit to avoid rate limiting
+        const uploadPromises = files.map(async (file) => {
+            const relativePath = path.relative(pathToUpload, file);
+            const fileBuffer = await fs.readFile(file);
+            const { error: uploadError } = await supabase.storage
+                .from('course-assets')
+                .upload(`${courseId}/${relativePath}`, fileBuffer, {
+                    upsert: true,
+                    contentType: getContentType(file)
+                });
+            if (uploadError) console.error(`[Upload Error] ${relativePath}:`, uploadError.message);
+        });
+        
+        await Promise.all(uploadPromises);
 
-        // 2. Try to extract data.json or main.js for initial data
+        // Extract metadata
         let courseData = { screens: [] };
         const dataPath = path.join(pathToUpload, 'data.json');
         if (await fs.pathExists(dataPath)) {
             courseData = await fs.readJson(dataPath);
         }
 
-        // 3. Create entry in Database
+        // Create Database entry
         const { error: dbError } = await supabase
             .from('courses')
-            .insert({
-                id: courseId,
-                name: baseName,
-                data: courseData
-            });
+            .insert({ id: courseId, name: baseName, data: courseData });
 
         if (dbError) throw dbError;
 
-        // Cleanup
-        await fs.remove(req.file.path);
-        await fs.remove(targetPath);
-
         res.json({ success: true, courseId });
     } catch (err) {
-        console.error('[Server] Upload error:', err);
-        if (targetPath) await fs.remove(targetPath);
-        res.status(500).json({ error: err.message });
+        console.error('[Upload API Failure]', err);
+        res.status(500).json({ error: 'Failed to process course upload', details: err.message });
+    } finally {
+        await fs.remove(tempDir).catch(() => {});
     }
 });
 
 // API: Get course data
 app.get('/api/course/:courseId', async (req, res) => {
     try {
-        const { courseId } = req.params;
+        if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+        
         const { data, error } = await supabase
             .from('courses')
             .select('data')
-            .eq('id', courseId)
+            .eq('id', req.params.courseId)
             .single();
             
         if (error) throw error;
-        res.json(data ? data.data : { screens: [] });
+        res.json(data.data || { screens: [] });
     } catch (err) {
+        console.error('[Course Data API Failure]', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -189,55 +195,47 @@ app.get('/api/course/:courseId', async (req, res) => {
 // API: Save course data
 app.post('/api/course/:courseId', async (req, res) => {
     try {
-        const { courseId } = req.params;
-        const data = req.body;
+        if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
         
         const { error } = await supabase
             .from('courses')
-            .update({ data })
-            .eq('id', courseId);
-            
+            .update({ data: req.body })
+            .eq('id', req.params.courseId);
         if (error) throw error;
         
-        // Also update data.json in storage for consistency if export is needed
+        // Background update of data.json in storage
         await supabase.storage
             .from('course-assets')
-            .upload(`${courseId}/data.json`, JSON.stringify(data, null, 4), {
+            .upload(`${req.params.courseId}/data.json`, JSON.stringify(req.body, null, 4), {
                 upsert: true,
                 contentType: 'application/json'
             });
 
         res.json({ success: true });
     } catch (err) {
-        console.error(`[Server] Error saving course ${req.params.courseId}:`, err);
         res.status(500).json({ error: err.message });
     }
 });
 
 // API: Upload audio
-app.post('/api/course/:courseId/upload-audio', uploadAudioMulter.single('audio'), async (req, res) => {
+app.post('/api/course/:courseId/upload-audio', upload.single('audio'), async (req, res) => {
     try {
+        if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+        
         const { courseId } = req.params;
-        const fileContent = await fs.readFile(req.file.path);
-        const supabasePath = `${courseId}/assets/audio/${req.file.filename}`;
+        const safeName = `audio_${Date.now()}${path.extname(req.file.originalname) || '.wav'}`;
+        const supabasePath = `${courseId}/assets/audio/${safeName}`;
         
         const { error } = await supabase.storage
             .from('course-assets')
-            .upload(supabasePath, fileContent, {
+            .upload(supabasePath, req.file.buffer, {
                 upsert: true,
                 contentType: req.file.mimetype
             });
-            
         if (error) throw error;
         
-        await fs.remove(req.file.path);
-        
-        // Return URL from Supabase Storage
-        const { data: { publicUrl } } = supabase.storage
-            .from('course-assets')
-            .getPublicUrl(supabasePath);
-            
-        res.json({ filename: req.file.filename, path: publicUrl });
+        const { data: { publicUrl } } = supabase.storage.from('course-assets').getPublicUrl(supabasePath);
+        res.json({ filename: safeName, path: publicUrl });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -245,81 +243,64 @@ app.post('/api/course/:courseId/upload-audio', uploadAudioMulter.single('audio')
 
 // API: Export to SCORM (ZIP)
 app.get('/api/course/:courseId/export', async (req, res) => {
-    const { courseId } = req.params;
-    const tempExportDir = path.join(TEMP_DIR, `export_${courseId}_${Date.now()}`);
+    if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
+    
+    const courseId = req.params.courseId;
+    const tempDir = path.join(os.tmpdir(), `export_${courseId}_${Date.now()}`);
     
     try {
-        await fs.ensureDir(tempExportDir);
+        await fs.ensureDir(tempDir);
         
-        // 1. List all files for this course in Supabase Storage
-        const { data: files, error } = await supabase.storage
-            .from('course-assets')
-            .list(courseId, { recursive: true });
-            
+        // 1. Get file list from Storage
+        const { data: files, error } = await supabase.storage.from('course-assets').list(courseId, { recursive: true });
         if (error) throw error;
         
-        // 2. Download all files
+        // 2. Download all files to temp
         for (const file of files) {
-            if (file.id) { // its a file
-                const { data: blob, error: dlError } = await supabase.storage
-                    .from('course-assets')
-                    .download(`${courseId}/${file.name}`);
-                    
-                if (dlError) {
-                    console.error(`Error downloading ${file.name}:`, dlError);
-                    continue;
-                }
-                
-                const targetFile = path.join(tempExportDir, file.name);
-                await fs.ensureDir(path.dirname(targetFile));
-                await fs.writeFile(targetFile, Buffer.from(await blob.arrayBuffer()));
+            const { data: blob, error: dlError } = await supabase.storage.from('course-assets').download(`${courseId}/${file.name}`);
+            if (dlError) {
+                console.error(`[Export Error] Failed to download ${file.name}:`, dlError.message);
+                continue;
             }
+            
+            const target = path.join(tempDir, file.name);
+            await fs.ensureDir(path.dirname(target));
+            await fs.writeFile(target, Buffer.from(await blob.arrayBuffer()));
         }
 
-        // 3. Zip it up
-        const zipName = `${courseId}_scorm.zip`;
-        const zipPath = path.join(TEMP_DIR, zipName);
+        // 3. Zip
+        const zipPath = path.join(os.tmpdir(), `${courseId}_out.zip`);
         const output = fs.createWriteStream(zipPath);
         const archive = archiver('zip', { zlib: { level: 9 } });
 
-        return new Promise((resolve, reject) => {
-            output.on('close', async () => {
-                // Upload the ZIP to storage so we can provide a link (Since Vercel won't serve local temp files easily)
-                const zipBuffer = await fs.readFile(zipPath);
-                const { error: uploadError } = await supabase.storage
-                    .from('course-assets')
-                    .upload(`exports/${zipName}`, zipBuffer, { upsert: true });
-                
-                if (uploadError) reject(uploadError);
-                
-                const { data: { publicUrl } } = supabase.storage
-                    .from('course-assets')
-                    .getPublicUrl(`exports/${zipName}`);
-                
-                // Cleanup temp
-                await fs.remove(tempExportDir);
-                await fs.remove(zipPath);
-                
-                res.json({ success: true, downloadUrl: publicUrl });
-                resolve();
-            });
-
-            archive.on('error', (err) => { reject(err); });
+        await new Promise((resolve, reject) => {
+            output.on('close', resolve);
+            archive.on('error', reject);
             archive.pipe(output);
-            archive.directory(tempExportDir, false);
+            archive.directory(tempDir, false);
             archive.finalize();
         });
 
+        // 4. Upload ZIP to exports (for sharing)
+        const zipBuffer = await fs.readFile(zipPath);
+        const zipName = `${courseId}_scorm_${Date.now()}.zip`;
+        const { error: upError } = await supabase.storage.from('course-assets').upload(`exports/${zipName}`, zipBuffer);
+        if (upError) throw upError;
+
+        const { data: { publicUrl } } = supabase.storage.from('course-assets').getPublicUrl(`exports/${zipName}`);
+        
+        // Cleanup
+        await Promise.all([fs.remove(tempDir), fs.remove(zipPath)]);
+        
+        res.json({ success: true, downloadUrl: publicUrl });
     } catch (err) {
-        console.error('Export error:', err);
-        res.status(500).json({ error: err.message });
+        console.error('[Export Failure]', err);
+        res.status(500).json({ error: 'Export failed', details: err.message });
     }
 });
 
 if (process.env.NODE_ENV !== 'production') {
-    app.listen(PORT, () => {
-        console.log(`Course Editor Server running at http://localhost:${PORT}`);
-    });
+    app.listen(PORT, () => console.log(`Server running local on http://localhost:${PORT}`));
 }
 
 module.exports = app;
