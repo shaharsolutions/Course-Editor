@@ -540,7 +540,9 @@ document.getElementById('preview-btn').onclick = () => {
 };
 
     previewCourseBtn.onclick = async () => {
-        showToast('תצוגה מקדימה מלאה זמינה רק לאחר ייצוא והעלאה לשרת, או בהרצה מקומית.', 'info');
+        if (!currentCourse) return;
+        window.open(`${API_BASE}/course/${currentCourse}/export`, '_blank');
+        showToast('מכין הורדה...', 'info');
     };
 
 const closePreview = () => {
@@ -560,23 +562,27 @@ window.onclick = (e) => {
 audioUpload.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!currentCourse) {
+        showToast('בחר לומדה תחילה', 'info');
+        return;
+    }
     
-    const formData = new FormData();
-    formData.append('audio', file);
-    
+    // For now, let's keep it simple and upload to course-assets bucket using supabaseClient
     showToast('מעלה קובץ...', 'info');
     
     try {
-        const response = await fetch(`${API_BASE}/course/${currentCourse}/upload-audio`, {
-            method: 'POST',
-            body: formData
-        });
-        const result = await response.json();
+        const filePath = `${currentCourse}/audio/${Date.now()}_${file.name}`;
+        const { data, error } = await supabaseClient.storage
+            .from('course-assets')
+            .upload(filePath, file);
         
-        audioPath.value = result.path;
-        audioFilename.textContent = result.filename;
+        if (error) throw error;
+        
+        audioPath.value = filePath;
+        audioFilename.textContent = file.name;
         showToast('הקובץ הועלה בהצלחה!');
     } catch (err) {
+        console.error('[App] Audio upload failed:', err);
         showToast('שגיאה בהעלאת הקובץ', 'error');
     }
 };

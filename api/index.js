@@ -221,4 +221,56 @@ app.post('/api/course/:id', async (req, res) => {
     res.json({ success: true });
 });
 
+// Export Course (ZIP)
+const archiver = require('archiver');
+app.get('/api/course/:id/export', async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        console.log('[Export] Exporting course:', courseId);
+
+        const { data: course, error: dbError } = await supabase
+            .from('courses')
+            .select('name, data')
+            .eq('id', courseId)
+            .single();
+
+        if (dbError || !course) throw new Error('Course not found');
+
+        // List files in storage
+        const { data: storageFiles, error: storageError } = await supabase.storage
+            .from('course-assets')
+            .list(courseId, { recursive: true });
+
+        if (storageError) throw storageError;
+
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${course.name || 'course'}.zip"`);
+
+        const archive = archiver('zip', { zlib: { level: 9 } });
+        archive.pipe(res);
+
+        // Add data.json
+        archive.append(JSON.stringify(course.data, null, 2), { name: 'data.json' });
+
+        // Add files from storage
+        for (const file of storageFiles) {
+            if (file.name === '.emptyFolderPlaceholder') continue;
+            
+            const { data: fileData, error: dlError } = await supabase.storage
+                .from('course-assets')
+                .download(`${courseId}/${file.name}`);
+            
+            if (!dlError) {
+                archive.append(Buffer.from(await fileData.arrayBuffer()), { name: file.name });
+            }
+        }
+
+        await archive.finalize();
+        console.log('[Export] Export finished.');
+    } catch (err) {
+        console.error('[Export] Failed:', err.message);
+        res.status(500).send('Export failed');
+    }
+});
+
 module.exports = app;
