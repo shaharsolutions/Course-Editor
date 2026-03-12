@@ -577,8 +577,10 @@ document.getElementById('preview-btn').onclick = () => {
                     <p>${isQ ? '' : content}</p>
                     ${optionsHtml}
                 </div>
+                <div class="mockup-nav-internal">
+                    <button class="mockup-btn">${isQ ? 'בדוק תשובה' : 'המשך'}</button>
+                </div>
             </div>
-            <div class="mockup-nav"><button class="mockup-btn">${isQ ? 'בדוק תשובה' : 'המשך'}</button></div>
             <div class="mockup-character">
                 <img src="${baseUrl}assets/${characterImg}" class="mockup-character-img">
                 <div class="mockup-label">${characterLabel}</div>
