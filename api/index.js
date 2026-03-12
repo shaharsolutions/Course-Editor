@@ -34,7 +34,11 @@ app.get('/api/health', (req, res) => {
         ok: true,
         env: process.env.NODE_ENV,
         supabaseUrl: !!supabaseUrl,
-        supabaseKey: !!supabaseKey
+        supabaseKey: !!supabaseKey,
+        keyLength: supabaseKey ? supabaseKey.length : 0,
+        keyStart: supabaseKey ? supabaseKey.substring(0, 10) : 'EMPTY',
+        keyEnd: supabaseKey ? supabaseKey.substring(supabaseKey.length - 10) : 'EMPTY',
+        urlValue: supabaseUrl || 'EMPTY'
     });
 });
 
