@@ -1,20 +1,4 @@
 console.log('[App] Version: 2.0 - Direct Upload');
-const API_BASE = window.location.origin.includes('localhost') ? 'http://localhost:3030/api' : '/api';
-let currentCourse = null;
-let currentCourseData = { screens: [] };
-let selectedSlideIndex = -1;
-let selectedSlidesIndices = new Set();
-let supabaseClient = null;
-
-// Initialize Supabase Client (Frontend)
-const SUPABASE_URL = 'https://czfjbmkjnodonmtjvwep.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6ZmpibWtqbm9kb25tdGp2d2VwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NjA5MzQsImV4cCI6MjA4ODUzNjkzNH0.R8syO-AS9CcIrP3tYBFO9PTs388UG7rs6SCoVx1Sb4A';
-
-if (window.supabase) {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    console.log('[App] Supabase Frontend initialized');
-}
-
 // --- Elements ---
 const courseSelector = document.getElementById('course-selector');
 const slidesList = document.getElementById('slides-list');
@@ -27,8 +11,6 @@ const selectAllSlides = document.getElementById('select-all-slides');
 const bulkActions = document.getElementById('bulk-actions');
 const bulkMinDelay = document.getElementById('bulk-min-delay');
 const applyBulkDelayBtn = document.getElementById('apply-bulk-delay');
-
-// Form Fields
 const slideTitle = document.getElementById('slide-title');
 const slideContent = document.getElementById('slide-content');
 const slideBg = document.getElementById('slide-bg');
@@ -45,6 +27,12 @@ const optionsContainer = document.getElementById('options-container');
 const addOptionBtn = document.getElementById('add-option-btn');
 const uploadCourseBtn = document.getElementById('upload-course-btn');
 const courseFileInput = document.getElementById('course-file-input');
+
+let currentCourse = null;
+let currentCourseData = { screens: [] };
+let selectedSlideIndex = -1;
+let selectedSlidesIndices = new Set();
+let supabaseClient = null;
 
 // --- Initialization ---
 async function init() {
@@ -68,9 +56,12 @@ async function init() {
 }
 
 // Course Upload Logic (Direct to Supabase to bypass Vercel 4.5MB limit)
-uploadCourseBtn.onclick = () => courseFileInput.click();
+if (uploadCourseBtn) {
+    uploadCourseBtn.onclick = () => courseFileInput.click();
+}
 
-courseFileInput.onchange = async (e) => {
+if (courseFileInput) {
+    courseFileInput.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file || !supabaseClient) return;
 
