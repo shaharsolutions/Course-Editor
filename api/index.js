@@ -7,6 +7,12 @@ const AdmZip = require('adm-zip');
 const path = require('path');
 const fs = require('fs-extra');
 const os = require('os');
+const crypto = require('crypto');
+
+// Generate proper UUID v4
+function generateUUID() {
+    return crypto.randomUUID();
+}
 
 const app = express();
 
@@ -137,14 +143,15 @@ app.post('/api/courses/process-zip', async (req, res) => {
             courseData = await fs.readJson(dataJsonPath);
         }
 
-        // 6. DB Upsert (Minimal columns to avoid errors)
+        // 6. DB Upsert - Use UUID for the database, but keep courseId for storage paths
+        const dbId = generateUUID();
         const { error: dbError } = await supabase
             .from('courses')
-            .upsert({ 
-                id: courseId, 
+            .insert({ 
+                id: dbId, 
                 name: baseName, 
                 data: courseData
-            }, { onConflict: 'id' });
+            });
 
         if (dbError) throw new Error(`Database upsert failed: ${dbError.message}`);
         console.log('[Process] Database updated successfully.');
