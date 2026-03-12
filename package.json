@@ -2,10 +2,10 @@
   "name": "lms-course-editor",
   "version": "1.0.0",
   "description": "A modern editor for LMS course screens",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
   "dependencies": {
     "@google-cloud/text-to-speech": "^6.4.0",

@@ -25,7 +25,7 @@ fs.ensureDirSync(UPLOADS_DIR);
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../public')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Configure storage for audio files (Local temp before Supabase upload)
 const audioStorage = multer.diskStorage({
