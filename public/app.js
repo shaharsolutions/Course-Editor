@@ -49,6 +49,13 @@ const uploadCourseBtn = document.getElementById('upload-course-btn');
 const deleteCourseBtn = document.getElementById('delete-course-btn');
 const courseFileInput = document.getElementById('course-file-input');
 
+// Confirm Modal
+const confirmModal = document.getElementById('confirm-modal');
+const confirmTitle = document.getElementById('confirm-title');
+const confirmMessage = document.getElementById('confirm-message');
+const confirmOk = document.getElementById('confirm-ok');
+const confirmCancel = document.getElementById('confirm-cancel');
+
 // --- Initialization ---
 async function init() {
     console.log('[App] Initializing Course Editor...');
@@ -129,9 +136,11 @@ if (deleteCourseBtn) {
         }
 
         const courseName = courseSelector.options[courseSelector.selectedIndex].text;
-        if (!confirm(`האם אתה בטוח שברצונך למחוק את הלומדה "${courseName}"? פעולה זו אינה ניתנת לביטול.`)) {
-            return;
-        }
+        const confirmed = await showConfirm(
+            'מחיקת לומדה',
+            `האם אתה בטוח שברצונך למחוק את הלומדה "${courseName}"? כל הקבצים והשקפים יימחקו לצמיתות.`
+        );
+        if (!confirmed) return;
 
         const toastMsg = showPersistentToast('מוחק לומדה...', 'info');
         try {
@@ -183,7 +192,11 @@ async function loadCourse(courseId) {
             showToast('הלומדה הומרה מפורמט ישן. לחץ על שמירה כדי לקבע את השינויים.', 'info');
             currentCourseData = { screens: data.screens };
         } else if (data.legacy) {
-            if(confirm('הלומדה משתמשת בפורמט ישן. האם להמיר אותה לפורמט הניתן לעריכה?')) {
+            const confirmed = await showConfirm(
+                'המרה לפורמט חדש',
+                'הלומדה משתמשת בפורמט ישן. האם להמיר אותה לפורמט הניתן לעריכה?'
+            );
+            if (confirmed) {
                 currentCourseData = { 
                     screens: [{ id: 'welcome', title: 'שקף חדש', content: 'תוכן כאן', bgImage: 'assets/scene_welcome.png' }] 
                 };
@@ -315,7 +328,11 @@ applyBulkDelayBtn.onclick = async () => {
 };
 
 async function deleteSlide(index) {
-    if (!confirm('האם אתה בטוח שברצונך למחוק את השקף?')) return;
+    const confirmed = await showConfirm(
+        'מחיקת שקף',
+        'האם אתה בטוח שברצונך למחוק את השקף הנוכחי?'
+    );
+    if (!confirmed) return;
     
     currentCourseData.screens.splice(index, 1);
     
@@ -596,7 +613,31 @@ const closePreview = () => {
 closeModal.onclick = closePreview;
 window.onclick = (e) => {
     if (e.target === previewModal) closePreview();
+    if (e.target === confirmModal) hideConfirm(false);
 };
+
+// Custom Confirm Helper
+function showConfirm(title, message) {
+    return new Promise((resolve) => {
+        confirmTitle.textContent = title;
+        confirmMessage.textContent = message;
+        confirmModal.classList.remove('hidden');
+        
+        confirmOk.onclick = () => {
+            confirmModal.classList.add('hidden');
+            resolve(true);
+        };
+        
+        confirmCancel.onclick = () => {
+            confirmModal.classList.add('hidden');
+            resolve(false);
+        };
+    });
+}
+
+function hideConfirm(value) {
+    confirmModal.classList.add('hidden');
+}
 
 // --- Audio Upload ---
 audioUpload.onchange = async (e) => {
