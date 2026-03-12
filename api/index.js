@@ -126,17 +126,30 @@ app.post('/api/courses/process-zip', async (req, res) => {
             courseData = await fs.readJson(path.join(root, 'data.json'));
         }
 
-        await supabase.from('courses').insert({ id: courseId, name: baseName, data: courseData });
+        // DB - Use upsert to handle existing records and be more robust
+        const { error: dbError } = await supabase
+            .from('courses')
+            .upsert({ 
+                id: courseId, 
+                name: baseName, 
+                data: courseData,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'id' });
+
+        if (dbError) {
+            console.error('[Supabase DB Error]', dbError);
+            throw new Error(`Database error: ${dbError.message} (Hint: ${dbError.hint || 'none'})`);
+        }
         
         // Cleanup
-        await fs.remove(tempDir);
-        await fs.remove(localZip);
-        await supabase.storage.from('course-assets').remove([zipPath]);
+        await fs.remove(tempDir).catch(() => {});
+        await fs.remove(localZip).catch(() => {});
+        await supabase.storage.from('course-assets').remove([zipPath]).catch(() => {});
 
-        res.json({ success: true });
+        res.json({ success: true, courseId });
     } catch (err) {
         console.error('[Error] process-zip:', err.message);
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Processing failed', details: err.message });
     }
 });
 
