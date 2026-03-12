@@ -1,3 +1,4 @@
+console.log('[App] Version: 2.0 - Direct Upload');
 const API_BASE = window.location.origin.includes('localhost') ? 'http://localhost:3030/api' : '/api';
 let currentCourse = null;
 let currentCourseData = { screens: [] };
