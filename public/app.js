@@ -32,12 +32,19 @@ const questionFields = document.getElementById('question-fields');
 const questionFeedback = document.getElementById('question-feedback');
 const optionsContainer = document.getElementById('options-container');
 const addOptionBtn = document.getElementById('add-option-btn');
+const uploadCourseBtn = document.getElementById('upload-course-btn');
+const courseFileInput = document.getElementById('course-file-input');
 
 // --- Initialization ---
 async function init() {
     try {
         const response = await fetch(`${API_BASE}/courses`);
         const courses = await response.json();
+        
+        // Clear existing options except the first one
+        while (courseSelector.options.length > 1) {
+            courseSelector.remove(1);
+        }
         
         courses.forEach(course => {
             const option = document.createElement('option');
@@ -49,6 +56,49 @@ async function init() {
         showToast('נכשל בטעינת רשימת הלומדות', 'error');
     }
 }
+
+// Course Upload Logic
+uploadCourseBtn.onclick = () => courseFileInput.click();
+
+courseFileInput.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.zip')) {
+        showToast('אנא בחר קובץ ZIP בלבד', 'error');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('courseZip', file);
+
+    const toastMsg = showPersistentToast('מעלה קורס ומחלץ קבצים...', 'info');
+
+    try {
+        const response = await fetch(`${API_BASE}/courses/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('הקורס הועלה וטופל בהצלחה!');
+            await init(); // Refresh course list
+            
+            // Set uploaded course as active
+            courseSelector.value = result.courseId;
+            courseSelector.dispatchEvent(new Event('change'));
+        } else {
+            showToast(result.error || 'שגיאה בהעלאת הקורס', 'error');
+        }
+    } catch (err) {
+        showToast('שגיאה בחיבור לשרת', 'error');
+    } finally {
+        hidePersistentToast(toastMsg);
+        courseFileInput.value = ''; // Reset input
+    }
+};
 
 courseSelector.addEventListener('change', async (e) => {
     const courseId = e.target.value;
@@ -543,6 +593,17 @@ function showToast(message, type = 'success') {
     toast.className = type;
     toast.classList.remove('hidden');
     setTimeout(() => toast.classList.add('hidden'), 3000);
+}
+
+function showPersistentToast(message, type = 'info') {
+    toast.textContent = message;
+    toast.className = type;
+    toast.classList.remove('hidden');
+    return message; // Simple way to track
+}
+
+function hidePersistentToast(id) {
+    toast.classList.add('hidden');
 }
 
 init();

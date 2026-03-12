@@ -4,10 +4,15 @@ const path = require('path');
 const multer = require('multer');
 const cors = require('cors');
 const archiver = require('archiver');
+const AdmZip = require('adm-zip');
 
 const app = express();
 const PORT = 3030;
 const LMS_FILES_DIR = path.join(__dirname, '..');
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+
+// Ensure uploads directory exists
+fs.ensureDirSync(UPLOADS_DIR);
 
 app.use(cors());
 app.use(express.json());
@@ -48,6 +53,76 @@ app.get('/api/courses', async (req, res) => {
         }
         res.json(courses);
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Configure storage for ZIP uploads
+const zipUpload = multer({ dest: UPLOADS_DIR });
+
+// API: Upload course ZIP
+app.post('/api/courses/upload', zipUpload.single('courseZip'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const zip = new AdmZip(req.file.path);
+        
+        // Determine folder name from ZIP name
+        let folderName = path.parse(req.file.originalname).name.replace(/[^a-z0-9_\-\u0590-\u05FF]/gi, '_');
+        let targetPath = path.join(LMS_FILES_DIR, folderName);
+        
+        // Ensure folder name is unique
+        let counter = 1;
+        while (await fs.pathExists(targetPath)) {
+            targetPath = path.join(LMS_FILES_DIR, `${folderName}_${counter}`);
+            counter++;
+        }
+        
+        folderName = path.basename(targetPath);
+        
+        console.log(`[Server] Extracting course to: ${targetPath}`);
+        
+        try {
+            // Extract directly to target folder
+            zip.extractAllTo(targetPath, true);
+        } catch (extractErr) {
+            console.error('[Server] Extraction error:', extractErr);
+            await fs.remove(targetPath); // Cleanup failed folder
+            return res.status(500).json({ error: 'Failed to extract ZIP file. It may be corrupted.' });
+        }
+        
+        // Cleanup temp file
+        await fs.remove(req.file.path);
+        
+        // Verify it looks like a course we can handle
+        const mainJsPath = path.join(targetPath, 'scripts', 'main.js');
+        if (!(await fs.pathExists(mainJsPath))) {
+             // Maybe it was wrapped in a subfolder inside the zip?
+             const entries = await fs.readdir(targetPath);
+             const subdirs = [];
+             for(const entry of entries) {
+                 if((await fs.stat(path.join(targetPath, entry))).isDirectory()) {
+                     subdirs.push(entry);
+                 }
+             }
+
+             if(subdirs.length === 1) {
+                 const subDirPath = path.join(targetPath, subdirs[0]);
+                 if(await fs.pathExists(path.join(subDirPath, 'scripts', 'main.js'))) {
+                     console.log(`[Server] Detected nested folder structure, flattening...`);
+                     const tempMove = path.join(UPLOADS_DIR, `temp_${Date.now()}`);
+                     await fs.move(subDirPath, tempMove);
+                     await fs.remove(targetPath);
+                     await fs.move(tempMove, targetPath);
+                 }
+             }
+        }
+
+        res.json({ success: true, courseId: folderName });
+    } catch (err) {
+        console.error('[Server] Upload error:', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -227,8 +302,11 @@ app.get('/api/course/:courseId/export', async (req, res) => {
         archive.pipe(output);
 
         // Add the entire course directory to the zip
-        // Exclude data.json if not needed for production, but usually harmless
-        archive.directory(coursePath, false);
+        // Exclude backup files and temporary data
+        archive.glob('**/*', {
+            cwd: coursePath,
+            ignore: ['**/main.js.bak_*', '**/Thumbs.db', '**/.DS_Store']
+        });
         await archive.finalize();
 
     } catch (err) {
