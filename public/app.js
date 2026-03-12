@@ -4,14 +4,14 @@ let currentCourse = null;
 let currentCourseData = { screens: [] };
 let selectedSlideIndex = -1;
 let selectedSlidesIndices = new Set();
-let supabase = null;
+let supabaseClient = null;
 
 // Initialize Supabase Client (Frontend)
 const SUPABASE_URL = 'https://czfjbmkjnodonmtjvwep.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6ZmpibWtqbm9kb25tdGp2d2VwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NjA5MzQsImV4cCI6MjA4ODUzNjkzNH0.R8syO-AS9CcIrP3tYBFO9PTs388UG7rs6SCoVx1Sb4A';
 
 if (window.supabase) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     console.log('[App] Supabase Frontend initialized');
 }
 
@@ -45,7 +45,7 @@ uploadCourseBtn.onclick = () => courseFileInput.click();
 
 courseFileInput.onchange = async (e) => {
     const file = e.target.files[0];
-    if (!file || !supabase) return;
+    if (!file || !supabaseClient) return;
 
     const baseName = file.name.replace('.zip', '').replace(/[^a-z0-9_\-\u0590-\u05FF]/gi, '_');
     const courseId = `${baseName}_${Date.now()}`;
@@ -53,7 +53,7 @@ courseFileInput.onchange = async (e) => {
 
     try {
         // 1. Upload ZIP to a special folder in the bucket
-        const { data, error } = await supabase.storage
+        const { data, error } = await supabaseClient.storage
             .from('course-assets')
             .upload(`temp_zips/${courseId}.zip`, file);
 
