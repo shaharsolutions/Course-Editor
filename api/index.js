@@ -126,23 +126,27 @@ app.post('/api/courses/process-zip', async (req, res) => {
         zip.extractAllTo(tempDir, true);
         console.log('[Process] Extracted files to temp directory.');
 
-        // 3. Find root folder
+        // 3. Generate the final DB ID now so we can use it for storage path
+        const dbId = generateUUID();
+        console.log(`[Process] Using UUID for storage: ${dbId}`);
+
+        // 4. Find root folder
         let root = tempDir;
         const sub = await fs.readdir(tempDir);
         if (sub.length === 1 && (await fs.stat(path.join(tempDir, sub[0]))).isDirectory()) {
             root = path.join(tempDir, sub[0]);
         }
 
-        // 4. Upload files (Parallel to save time)
+        // 5. Upload files (Parallel to save time)
         const files = await getFiles(root);
-        console.log(`[Process] Uploading ${files.length} files...`);
+        console.log(`[Process] Uploading ${files.length} files to folder ${dbId}...`);
         
         await Promise.all(files.map(async (f) => {
             const rel = path.relative(root, f);
             const content = await fs.readFile(f);
             const { error: upErr } = await supabase.storage
                 .from('course-assets')
-                .upload(`${courseId}/${rel}`, content, { upsert: true });
+                .upload(`${dbId}/${rel}`, content, { upsert: true });
             if (upErr) console.warn(`[Process] Warning: failed to upload ${rel}:`, upErr.message);
         }));
         console.log('[Process] Finished uploading assets.');
@@ -162,7 +166,7 @@ app.post('/api/courses/process-zip', async (req, res) => {
         }
 
         // 6. DB Insert - Simplified logic using discovered Org ID
-        const dbId = generateUUID();
+        // dbId is already defined above
         
         // Discovered Org ID from your environment
         const HARDCODED_ORG_ID = "526d46ee-26ea-4b2f-9026-a579c64cccf2";

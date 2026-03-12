@@ -549,17 +549,12 @@ document.getElementById('preview-btn').onclick = () => {
     const content = slideContent.value;
     const bg = slideBg.value;
     const audio = audioPath.value;
-    
-    // Construct URLs for Supabase Storage
     const storageUrl = `https://czfjbmkjnodonmtjvwep.supabase.co/storage/v1/object/public/course-assets/${courseId}/`;
     const bgUrl = bg ? (bg.startsWith('http') ? bg : storageUrl + bg) : '';
     const audioUrl = audio ? (audio.startsWith('http') ? audio : storageUrl + audio) : '';
-    
-    const characterImg = courseId.toLowerCase().includes('infosec') ? 'maya_guide.png' : 'mia_transparent_v4.png';
-    const characterLabel = courseId.toLowerCase().includes('infosec') ? 'מיה - הממונה על אבטחת מידע' : 'מונה - הממונה על מניעת הטרדה מינית';
-    const screenData = currentCourseData.screens[selectedSlideIndex];
     const isQ = isQuestion.checked;
     const qText = questionText.value;
+    const screenData = currentCourseData.screens[selectedSlideIndex];
     const optionsHtml = (isQ && screenData.question && screenData.question.options) 
         ? `<div class="mockup-options">
             ${screenData.question.options.map(opt => `<div class="mockup-option">${opt.text || 'אפשרות ריקה'}</div>`).join('')}
@@ -567,23 +562,33 @@ document.getElementById('preview-btn').onclick = () => {
         : '';
 
     // Inject HTML
+    // Use a more robust check for character based on course name or ID
+    const courseTitle = courseSelector.options[courseSelector.selectedIndex].text;
+    const isInfoSec = (courseTitle.includes('אבטחת מידע') || courseId.toLowerCase().includes('infosec'));
+    const charImg = isInfoSec ? 'maya_guide.png' : 'mia_transparent_v4.png';
+    const charLabel = isInfoSec ? 'מיה - הממונה על אבטחת מידע' : 'מונה - הממונה על מניעת הטרדה מינית';
+
     previewFrame.innerHTML = `
         <div class="course-mockup" style="background-image: url('${bgUrl}')">
             <div class="background-overlay"></div>
             <div class="mockup-progress-container"><div class="mockup-progress-bar"></div></div>
+            
+            <div class="mockup-character-container">
+                <img src="${baseUrl}assets/${charImg}" class="mockup-character-img">
+                <div class="mockup-label">${charLabel}</div>
+            </div>
+
             <div class="content-area-mockup">
                 <div class="screen active">
                     <h1>${isQ ? qText : title}</h1>
-                    <p>${isQ ? '' : content}</p>
-                    ${optionsHtml}
+                    <div class="content-body">
+                        <p>${isQ ? '' : content}</p>
+                        ${optionsHtml}
+                    </div>
                 </div>
                 <div class="mockup-nav-internal">
                     <button class="mockup-btn">${isQ ? 'בדוק תשובה' : 'המשך'}</button>
                 </div>
-            </div>
-            <div class="mockup-character">
-                <img src="${baseUrl}assets/${characterImg}" class="mockup-character-img">
-                <div class="mockup-label">${characterLabel}</div>
             </div>
         </div>
     `;
