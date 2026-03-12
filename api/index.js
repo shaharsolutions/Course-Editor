@@ -159,13 +159,14 @@ app.post('/api/courses/process-zip', async (req, res) => {
             id: dbId, 
             name: baseName, 
             title: baseName,
-            description: baseName,
-            category: 'כללי',
+            description: baseName || '',
             data: courseData
         };
         
-        // Add org_id if we found one
+        // Add org_id if we found one (Required for your LMS)
         if (orgId) insertData.org_id = orgId;
+        
+        console.log('[Process] Final insert data keys:', Object.keys(insertData));
 
         const { error: dbError } = await supabase
             .from('courses')
