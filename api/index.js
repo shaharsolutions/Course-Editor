@@ -52,22 +52,36 @@ app.get('/api/health', (req, res) => {
 app.get('/api/courses', async (req, res) => {
     try {
         if (!supabaseUrl || !supabaseKey) {
-            return res.status(503).json({ error: 'Supabase credentials missing on server' });
+            return res.status(503).json({ error: 'Supabase credentials missing' });
         }
         
+        // Try to be smart: first try id, name. If it fails, try to get anything.
         const { data, error } = await supabase
             .from('courses')
-            .select('id, name')
+            .select('*') // Select all to see what we have
+            .limit(50)
             .order('created_at', { ascending: false });
             
         if (error) {
             console.error('[Supabase Error] courses:', error);
-            throw error;
+            // If the table is missing or columns are wrong
+            return res.status(500).json({ 
+                error: 'Database query failed', 
+                message: error.message,
+                hint: 'Check if table "courses" exists and has columns id, name, data' 
+            });
         }
-        res.json(data || []);
+
+        // Map the results to ensure we have id and name
+        const mappedData = (data || []).map(item => ({
+            id: item.id || item.course_id || item.ID,
+            name: item.name || item.title || item.CourseName || item.id
+        }));
+
+        res.json(mappedData);
     } catch (err) {
         console.error('[Error] GET /api/courses:', err.message);
-        res.status(500).json({ error: 'Database query failed', details: err.message });
+        res.status(500).json({ error: 'Internal server error', details: err.message });
     }
 });
 
