@@ -10,7 +10,7 @@
   "dependencies": {
     "@google-cloud/text-to-speech": "^6.4.0",
     "@google/generative-ai": "^0.24.1",
-    "@supabase/supabase-js": "^2.99.1",
+    "@supabase/supabase-js": "^2.45.1",
     "adm-zip": "^0.5.16",
     "archiver": "^7.0.1",
     "axios": "^1.13.6",

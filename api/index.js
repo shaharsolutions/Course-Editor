@@ -17,15 +17,16 @@ app.use(express.json({ limit: '50mb' }));
 // Static files - Vercel serves from /public by default, but we help it
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Initialize Supabase safely
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+// Initialize Supabase safely with aggressive cleaning
+const cleanEnv = (val) => (val || '').replace(/[\r\n\t]/g, '').trim();
+const supabaseUrl = cleanEnv(process.env.SUPABASE_URL);
+const supabaseKey = cleanEnv(process.env.SUPABASE_ANON_KEY);
 
 if (!supabaseUrl || !supabaseKey) {
-    console.error('[CRITICAL] Missing Supabase environment variables! Check Vercel Settings.');
+    console.error('[CRITICAL] Missing Supabase environment variables!');
 }
 
-const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder');
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Diagnostics
 app.get('/api/health', (req, res) => {
@@ -40,18 +41,23 @@ app.get('/api/health', (req, res) => {
 // API: List courses
 app.get('/api/courses', async (req, res) => {
     try {
-        if (!supabaseUrl) throw new Error('SUPABASE_URL is missing');
+        if (!supabaseUrl || !supabaseKey) {
+            return res.status(503).json({ error: 'Supabase credentials missing on server' });
+        }
         
         const { data, error } = await supabase
             .from('courses')
             .select('id, name')
             .order('created_at', { ascending: false });
             
-        if (error) throw error;
+        if (error) {
+            console.error('[Supabase Error] courses:', error);
+            throw error;
+        }
         res.json(data || []);
     } catch (err) {
         console.error('[Error] GET /api/courses:', err.message);
-        res.status(500).json({ error: 'Database connection failed', message: err.message });
+        res.status(500).json({ error: 'Database query failed', details: err.message });
     }
 });
 
