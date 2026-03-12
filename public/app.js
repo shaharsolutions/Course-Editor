@@ -1,5 +1,24 @@
-console.log('[App] Version: 2.0 - Direct Upload');
-// --- Elements ---
+console.log('[App] Version: 2.1 - Fix ReferenceError');
+
+// --- Configuration ---
+const API_BASE = window.location.origin.includes('localhost') ? 'http://localhost:3030/api' : '/api';
+const SUPABASE_URL = 'https://czfjbmkjnodonmtjvwep.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6ZmpibWtqbm9kb25tdGp2d2VwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NjA5MzQsImV4cCI6MjA4ODUzNjkzNH0.R8syO-AS9CcIrP3tYBFO9PTs388UG7rs6SCoVx1Sb4A';
+
+// --- Global State ---
+let currentCourse = null;
+let currentCourseData = { screens: [] };
+let selectedSlideIndex = -1;
+let selectedSlidesIndices = new Set();
+let supabaseClient = null;
+
+// Initialize Supabase Client (Frontend)
+if (window.supabase) {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    console.log('[App] Supabase Frontend initialized');
+}
+
+// --- DOM Elements ---
 const courseSelector = document.getElementById('course-selector');
 const slidesList = document.getElementById('slides-list');
 const editorForm = document.getElementById('editor-form');
@@ -28,12 +47,6 @@ const addOptionBtn = document.getElementById('add-option-btn');
 const uploadCourseBtn = document.getElementById('upload-course-btn');
 const courseFileInput = document.getElementById('course-file-input');
 
-let currentCourse = null;
-let currentCourseData = { screens: [] };
-let selectedSlideIndex = -1;
-let selectedSlidesIndices = new Set();
-let supabaseClient = null;
-
 // --- Initialization ---
 async function init() {
     console.log('[App] Initializing Course Editor...');
@@ -42,13 +55,15 @@ async function init() {
         if (!response.ok) throw new Error('Failed to fetch courses');
         const courses = await response.json();
         
-        while (courseSelector.options.length > 1) courseSelector.remove(1);
-        courses.forEach(course => {
-            const option = document.createElement('option');
-            option.value = course.id;
-            option.textContent = course.name;
-            courseSelector.appendChild(option);
-        });
+        if (courseSelector) {
+            while (courseSelector.options.length > 1) courseSelector.remove(1);
+            courses.forEach(course => {
+                const option = document.createElement('option');
+                option.value = course.id;
+                option.textContent = course.name;
+                courseSelector.appendChild(option);
+            });
+        }
     } catch (err) {
         console.error('[App] Init Error:', err);
         showToast('נכשל בטעינת רשימת הלומדות מהשרת', 'error');
@@ -62,47 +77,47 @@ if (uploadCourseBtn) {
 
 if (courseFileInput) {
     courseFileInput.onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file || !supabaseClient) return;
+        const file = e.target.files[0];
+        if (!file || !supabaseClient) return;
 
-    const baseName = file.name.replace('.zip', '').replace(/[^a-z0-9_\-\u0590-\u05FF]/gi, '_');
-    const courseId = `${baseName}_${Date.now()}`;
-    const toastMsg = showPersistentToast('מעלה קובץ ZIP ישירות לענן...', 'info');
+        const baseName = file.name.replace('.zip', '').replace(/[^a-z0-9_\-\u0590-\u05FF]/gi, '_');
+        const courseId = `${baseName}_${Date.now()}`;
+        const toastMsg = showPersistentToast('מעלה קובץ ZIP ישירות לענן...', 'info');
 
-    try {
-        // 1. Upload ZIP to a special folder in the bucket
-        const { data, error } = await supabaseClient.storage
-            .from('course-assets')
-            .upload(`temp_zips/${courseId}.zip`, file);
+        try {
+            const { data, error } = await supabaseClient.storage
+                .from('course-assets')
+                .upload(`temp_zips/${courseId}.zip`, file);
 
-        if (error) throw error;
+            if (error) throw error;
 
-        // 2. Tell the server to process this ZIP
-        console.log('[App] ZIP uploaded, requesting extraction...');
-        const processResponse = await fetch(`${API_BASE}/courses/process-zip`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ courseId, baseName, zipPath: `temp_zips/${courseId}.zip` })
-        });
+            console.log('[App] ZIP uploaded, requesting extraction...');
+            const processResponse = await fetch(`${API_BASE}/courses/process-zip`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ courseId, baseName, zipPath: `temp_zips/${courseId}.zip` })
+            });
 
-        const result = await processResponse.json();
-        if (result.success) {
-            showToast('הקורס הועלה וטופל בהצלחה!');
-            await init();
-            courseSelector.value = courseId;
-            courseSelector.dispatchEvent(new Event('change'));
-        } else {
-            showToast(result.error || 'שגיאה בעיבוד הקורס', 'error');
+            const result = await processResponse.json();
+            if (result.success) {
+                showToast('הקורס הועלה וטופל בהצלחה!');
+                await init();
+                if (courseSelector) {
+                    courseSelector.value = courseId;
+                    courseSelector.dispatchEvent(new Event('change'));
+                }
+            } else {
+                showToast(result.error || 'שגיאה בעיבוד הקורס', 'error');
+            }
+        } catch (err) {
+            console.error('[App] Upload failed:', err);
+            showToast(`שגיאת העלאה: ${err.message}`, 'error');
+        } finally {
+            hidePersistentToast(toastMsg);
+            courseFileInput.value = '';
         }
-    } catch (err) {
-        console.error('[App] Upload failed:', err);
-        showToast(`שגיאת העלאה: ${err.message}`, 'error');
-    } finally {
-        hidePersistentToast(toastMsg);
-        courseFileInput.value = '';
-    }
-};
-
+    };
+}
 courseSelector.addEventListener('change', async (e) => {
     const courseId = e.target.value;
     if (!courseId) {
