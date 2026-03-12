@@ -4,6 +4,7 @@ console.log('[App] Version: 2.1 - Fix ReferenceError');
 const API_BASE = window.location.origin.includes('localhost') ? 'http://localhost:3030/api' : '/api';
 const SUPABASE_URL = 'https://czfjbmkjnodonmtjvwep.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6ZmpibWtqbm9kb25tdGp2d2VwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NjA5MzQsImV4cCI6MjA4ODUzNjkzNH0.R8syO-AS9CcIrP3tYBFO9PTs388UG7rs6SCoVx1Sb4A';
+const baseUrl = '/';
 
 // --- Global State ---
 let currentCourse = null;
