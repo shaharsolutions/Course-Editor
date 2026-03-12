@@ -102,7 +102,80 @@ async function getFilesRecursive(dir) {
     return Array.prototype.concat(...files);
 }
 
-// API: Upload course ZIP
+// API: Process ZIP from Storage (To bypass Vercel 4.5MB upload limit)
+app.post('/api/courses/process-zip', async (req, res) => {
+    const { courseId, baseName, zipPath } = req.body;
+    const tempDir = path.join(os.tmpdir(), `process_${courseId}`);
+
+    try {
+        if (!supabase) throw new Error('Supabase not configured');
+
+        // 1. Download ZIP from Storage to /tmp
+        console.log(`[Process] Downloading ZIP from storage: ${zipPath}`);
+        const { data: blob, error: dlError } = await supabase.storage
+            .from('course-assets')
+            .download(zipPath);
+        
+        if (dlError) throw dlError;
+
+        await fs.ensureDir(tempDir);
+        const localZipPath = path.join(os.tmpdir(), `${courseId}.zip`);
+        await fs.writeFile(localZipPath, Buffer.from(await blob.arrayBuffer()));
+
+        // 2. Extract
+        const zip = new AdmZip(localZipPath);
+        zip.extractAllTo(tempDir, true);
+
+        // 3. Flatten if needed
+        let pathToUpload = tempDir;
+        const entries = await fs.readdir(tempDir);
+        const subdirs = entries.filter(e => fs.statSync(path.join(tempDir, e)).isDirectory());
+        const filesAtRoot = entries.filter(e => !fs.statSync(path.join(tempDir, e)).isDirectory());
+        if (subdirs.length === 1 && filesAtRoot.length === 0) {
+            pathToUpload = path.join(tempDir, subdirs[0]);
+        }
+
+        // 4. Upload files back to Storage
+        const files = await getFilesRecursive(pathToUpload);
+        const uploadPromises = files.map(async (file) => {
+            const relPath = path.relative(pathToUpload, file);
+            const content = await fs.readFile(file);
+            await supabase.storage
+                .from('course-assets')
+                .upload(`${courseId}/${relPath}`, content, {
+                    upsert: true,
+                    contentType: getContentType(file)
+                });
+        });
+        await Promise.all(uploadPromises);
+
+        // 5. Extract metadata
+        let courseData = { screens: [] };
+        const dataPath = path.join(pathToUpload, 'data.json');
+        if (await fs.pathExists(dataPath)) {
+            courseData = await fs.readJson(dataPath);
+        }
+
+        // 6. DB Entry
+        const { error: dbError } = await supabase
+            .from('courses')
+            .insert({ id: courseId, name: baseName, data: courseData });
+
+        if (dbError) throw dbError;
+
+        // Cleanup
+        await fs.remove(tempDir);
+        await fs.remove(localZipPath);
+        await supabase.storage.from('course-assets').remove([zipPath]);
+
+        res.json({ success: true, courseId });
+    } catch (err) {
+        console.error('[Process Failure]', err);
+        res.status(500).json({ error: 'Processing failed', details: err.message });
+    }
+});
+
+// API: Upload course ZIP (Legacy/Small files only)
 app.post('/api/courses/upload', upload.single('courseZip'), async (req, res) => {
     if (!supabase) return res.status(503).json({ error: 'Supabase not configured' });
     

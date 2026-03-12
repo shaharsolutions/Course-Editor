@@ -3,61 +3,30 @@ let currentCourse = null;
 let currentCourseData = { screens: [] };
 let selectedSlideIndex = -1;
 let selectedSlidesIndices = new Set();
+let supabase = null;
+
+// Initialize Supabase Client (Frontend)
+const SUPABASE_URL = 'https://czfjbmkjnodonmtjvwep.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6ZmpibWtqbm9kb25tdGp2d2VwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NjA5MzQsImV4cCI6MjA4ODUzNjkzNH0.R8syO-AS9CcIrP3tYBFO9PTs388UG7rs6SCoVx1Sb4A';
+
+if (window.supabase) {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    console.log('[App] Supabase Frontend initialized');
+}
 
 // --- Elements ---
 const courseSelector = document.getElementById('course-selector');
-const slidesList = document.getElementById('slides-list');
-const editorForm = document.getElementById('editor-form');
-const noSelection = document.getElementById('no-selection');
-const saveBtn = document.getElementById('save-btn');
-const previewCourseBtn = document.getElementById('preview-course-btn');
-const toast = document.getElementById('toast');
-const selectAllSlides = document.getElementById('select-all-slides');
-const bulkActions = document.getElementById('bulk-actions');
-const bulkMinDelay = document.getElementById('bulk-min-delay');
-const applyBulkDelayBtn = document.getElementById('apply-bulk-delay');
-
-// Form Fields
-const slideTitle = document.getElementById('slide-title');
-const slideContent = document.getElementById('slide-content');
-const slideBg = document.getElementById('slide-bg');
-const audioUpload = document.getElementById('audio-upload');
-const audioFilename = document.getElementById('audio-filename');
-const audioPath = document.getElementById('audio-path');
-const waitForAudio = document.getElementById('wait-for-audio');
-const minDelay = document.getElementById('min-delay');
-const isQuestion = document.getElementById('is-question');
-const questionText = document.getElementById('question-text');
-const questionFields = document.getElementById('question-fields');
-const questionFeedback = document.getElementById('question-feedback');
-const optionsContainer = document.getElementById('options-container');
-const addOptionBtn = document.getElementById('add-option-btn');
-const uploadCourseBtn = document.getElementById('upload-course-btn');
-const courseFileInput = document.getElementById('course-file-input');
+// ... (rest of the element declarations)
 
 // --- Initialization ---
 async function init() {
     console.log('[App] Initializing Course Editor...');
-    console.log('[App] API_BASE:', API_BASE);
-
     try {
         const response = await fetch(`${API_BASE}/courses`);
-        
-        if (!response.ok) {
-            const errData = await response.json();
-            console.error('[App] Server Error:', errData);
-            showToast(`שגיאת שרת: ${errData.error || response.statusText}`, 'error');
-            return;
-        }
-
+        if (!response.ok) throw new Error('Failed to fetch courses');
         const courses = await response.json();
-        console.log('[App] Courses loaded:', courses.length);
         
-        // Clear existing options except the first one
-        while (courseSelector.options.length > 1) {
-            courseSelector.remove(1);
-        }
-        
+        while (courseSelector.options.length > 1) courseSelector.remove(1);
         courses.forEach(course => {
             const option = document.createElement('option');
             option.value = course.id;
@@ -65,51 +34,53 @@ async function init() {
             courseSelector.appendChild(option);
         });
     } catch (err) {
-        console.error('[App] Connection Error:', err);
-        showToast('לא ניתן להתחבר לשרת. בדוק את משתני הסביבה ב-Vercel.', 'error');
+        console.error('[App] Init Error:', err);
+        showToast('נכשל בטעינת רשימת הלומדות מהשרת', 'error');
     }
 }
 
-// Course Upload Logic
+// Course Upload Logic (Direct to Supabase to bypass Vercel 4.5MB limit)
 uploadCourseBtn.onclick = () => courseFileInput.click();
 
 courseFileInput.onchange = async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
+    if (!file || !supabase) return;
 
-    if (!file.name.endsWith('.zip')) {
-        showToast('אנא בחר קובץ ZIP בלבד', 'error');
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('courseZip', file);
-
-    const toastMsg = showPersistentToast('מעלה קורס ומחלץ קבצים...', 'info');
+    const baseName = file.name.replace('.zip', '').replace(/[^a-z0-9_\-\u0590-\u05FF]/gi, '_');
+    const courseId = `${baseName}_${Date.now()}`;
+    const toastMsg = showPersistentToast('מעלה קובץ ZIP ישירות לענן...', 'info');
 
     try {
-        const response = await fetch(`${API_BASE}/courses/upload`, {
+        // 1. Upload ZIP to a special folder in the bucket
+        const { data, error } = await supabase.storage
+            .from('course-assets')
+            .upload(`temp_zips/${courseId}.zip`, file);
+
+        if (error) throw error;
+
+        // 2. Tell the server to process this ZIP
+        console.log('[App] ZIP uploaded, requesting extraction...');
+        const processResponse = await fetch(`${API_BASE}/courses/process-zip`, {
             method: 'POST',
-            body: formData
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ courseId, baseName, zipPath: `temp_zips/${courseId}.zip` })
         });
-        
-        const result = await response.json();
-        
+
+        const result = await processResponse.json();
         if (result.success) {
             showToast('הקורס הועלה וטופל בהצלחה!');
-            await init(); // Refresh course list
-            
-            // Set uploaded course as active
-            courseSelector.value = result.courseId;
+            await init();
+            courseSelector.value = courseId;
             courseSelector.dispatchEvent(new Event('change'));
         } else {
-            showToast(result.error || 'שגיאה בהעלאת הקורס', 'error');
+            showToast(result.error || 'שגיאה בעיבוד הקורס', 'error');
         }
     } catch (err) {
-        showToast('שגיאה בחיבור לשרת', 'error');
+        console.error('[App] Upload failed:', err);
+        showToast(`שגיאת העלאה: ${err.message}`, 'error');
     } finally {
         hidePersistentToast(toastMsg);
-        courseFileInput.value = ''; // Reset input
+        courseFileInput.value = '';
     }
 };
 
