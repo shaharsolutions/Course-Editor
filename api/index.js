@@ -18,7 +18,13 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Initialize Supabase safely with aggressive cleaning
-const cleanEnv = (val) => (val || '').replace(/[\r\n\t]/g, '').trim();
+const cleanEnv = (val) => {
+    if (!val) return '';
+    let cleaned = val.replace(/[\r\n\t]/g, '').trim();
+    // Fix common copy-paste error where PORT=3030 is appended
+    cleaned = cleaned.replace(/PORT=\d+.*$/i, '').trim();
+    return cleaned;
+};
 const supabaseUrl = cleanEnv(process.env.SUPABASE_URL);
 const supabaseKey = cleanEnv(process.env.SUPABASE_ANON_KEY);
 
