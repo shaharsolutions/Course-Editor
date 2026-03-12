@@ -137,7 +137,14 @@ app.post('/api/courses/process-zip', async (req, res) => {
         console.log('[Process] Finished uploading assets.');
 
         // 5. Extract metadata
-        let courseData = { screens: [] };
+        let courseData = { 
+            screens: [{ 
+                id: 'slide_' + Date.now(), 
+                title: 'שקף פתיחה', 
+                content: 'ברוכים הבאים ללומדה החדשה שלך! ניתן לערוך את התוכן כאן.', 
+                bgImage: '' 
+            }] 
+        };
         const dataJsonPath = path.join(root, 'data.json');
         if (await fs.pathExists(dataJsonPath)) {
             courseData = await fs.readJson(dataJsonPath);
