@@ -161,7 +161,6 @@ app.post('/api/courses/process-zip', async (req, res) => {
             title: baseName,
             description: baseName,
             category: 'כללי',
-            entry_file: 'index.html',
             is_active: true,
             data: courseData
         };
