@@ -515,24 +515,15 @@ async function saveCourse() {
 }
 
 // --- Export ---
-document.getElementById('export-btn').onclick = async () => {
-    if (!currentCourse) return;
-    
-    showToast('מכין חבילת SCORM...', 'info');
-    
-    try {
-        const response = await fetch(`${API_BASE}/course/${currentCourse}/export`);
-        const result = await response.json();
-        
-        if (result.success) {
-            showToast('הייצוא בוצע בהצלחה! מוריד כעת...');
-            window.location.href = result.downloadUrl; // result.downloadUrl is already full URL
-        } else {
-            showToast('שגיאה בייצוא', 'error');
-        }
-    } catch (err) {
-        showToast('שגיאה בחיבור לשרת', 'error');
+document.getElementById('export-btn').onclick = () => {
+    if (!currentCourse) {
+        showToast('בחר לומדה תחילה', 'info');
+        return;
     }
+    
+    showToast('מכין חבילת SCORM להורדה...', 'info');
+    // Using window.open because the server returns a binary ZIP file
+    window.location.href = `${API_BASE}/course/${currentCourse}/export`;
 };
 
 // --- Preview ---

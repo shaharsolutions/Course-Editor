@@ -290,10 +290,13 @@ app.get('/api/course/:id/export', async (req, res) => {
 
         if (dbError || !course) throw new Error('Course not found');
 
-        // List files in storage
+        // List files in storage - Increased limit for complex courses
         const { data: storageFiles, error: storageError } = await supabase.storage
             .from('course-assets')
-            .list(courseId, { recursive: true });
+            .list(courseId, { 
+                recursive: true,
+                limit: 1000 // Handle larger courses
+            });
 
         if (storageError) throw storageError;
 
@@ -306,24 +309,35 @@ app.get('/api/course/:id/export', async (req, res) => {
         // Add data.json
         archive.append(JSON.stringify(course.data, null, 2), { name: 'data.json' });
 
-        // Add files from storage
-        for (const file of storageFiles) {
-            if (file.name === '.emptyFolderPlaceholder') continue;
-            
-            const { data: fileData, error: dlError } = await supabase.storage
-                .from('course-assets')
-                .download(`${courseId}/${file.name}`);
-            
-            if (!dlError) {
-                archive.append(Buffer.from(await fileData.arrayBuffer()), { name: file.name });
+        // Add files from storage in parallel batches to avoid overloading
+        const downloadFile = async (file) => {
+            if (file.name === '.emptyFolderPlaceholder') return;
+            try {
+                const { data: fileData, error: dlError } = await supabase.storage
+                    .from('course-assets')
+                    .download(`${courseId}/${file.name}`);
+                
+                if (!dlError) {
+                    archive.append(Buffer.from(await fileData.arrayBuffer()), { name: file.name });
+                }
+            } catch (e) {
+                console.warn(`[Export] Failed to add file ${file.name}:`, e.message);
             }
+        };
+
+        // Process in small batches to stay within safe memory/timeout limits
+        for (let i = 0; i < storageFiles.length; i += 10) {
+            const batch = storageFiles.slice(i, i + 10);
+            await Promise.all(batch.map(downloadFile));
         }
 
         await archive.finalize();
         console.log('[Export] Export finished.');
     } catch (err) {
         console.error('[Export] Failed:', err.message);
-        res.status(500).send('Export failed');
+        if (!res.headersSent) {
+            res.status(500).send('Export failed: ' + err.message);
+        }
     }
 });
 
