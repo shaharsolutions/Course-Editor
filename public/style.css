@@ -215,6 +215,28 @@ header h1 {
     transform: translateY(-2px);
 }
 
+.danger-btn {
+    padding: 12px;
+    background: rgba(244, 67, 54, 0.05);
+    border: 1px dashed var(--error-color);
+    color: var(--error-color);
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.danger-btn:hover {
+    background: rgba(244, 67, 54, 0.1);
+    transform: translateY(-2px);
+}
+
+.danger-btn.small-btn {
+    padding: 8px 12px;
+    margin: 0;
+    font-size: 0.85rem;
+}
+
 /* Main Workspace Styling */
 #workspace {
     padding: 40px;

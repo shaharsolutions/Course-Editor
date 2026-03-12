@@ -46,6 +46,7 @@ const questionFeedback = document.getElementById('question-feedback');
 const optionsContainer = document.getElementById('options-container');
 const addOptionBtn = document.getElementById('add-option-btn');
 const uploadCourseBtn = document.getElementById('upload-course-btn');
+const deleteCourseBtn = document.getElementById('delete-course-btn');
 const courseFileInput = document.getElementById('course-file-input');
 
 // --- Initialization ---
@@ -116,6 +117,45 @@ if (courseFileInput) {
         } finally {
             hidePersistentToast(toastMsg);
             courseFileInput.value = '';
+        }
+    };
+}
+
+if (deleteCourseBtn) {
+    deleteCourseBtn.onclick = async () => {
+        if (!currentCourse) {
+            showToast('בחר לומדה למחיקה', 'info');
+            return;
+        }
+
+        const courseName = courseSelector.options[courseSelector.selectedIndex].text;
+        if (!confirm(`האם אתה בטוח שברצונך למחוק את הלומדה "${courseName}"? פעולה זו אינה ניתנת לביטול.`)) {
+            return;
+        }
+
+        const toastMsg = showPersistentToast('מוחק לומדה...', 'info');
+        try {
+            const response = await fetch(`${API_BASE}/course/${currentCourse}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                showToast('הלומדה נמחקה בהצלחה');
+                currentCourse = null;
+                currentCourseData = { screens: [] };
+                renderSlidesList([]);
+                noSelection.classList.remove('hidden');
+                editorForm.classList.add('hidden');
+                await init();
+            } else {
+                const result = await response.json();
+                showToast(result.error || 'שגיאה במחיקת הלומדה', 'error');
+            }
+        } catch (err) {
+            console.error('[App] Delete failed:', err);
+            showToast(`שגיאת מחיקה: ${err.message}`, 'error');
+        } finally {
+            hidePersistentToast(toastMsg);
         }
     };
 }

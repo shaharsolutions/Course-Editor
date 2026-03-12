@@ -221,6 +221,37 @@ app.post('/api/course/:id', async (req, res) => {
     res.json({ success: true });
 });
 
+// Delete Course
+app.delete('/api/course/:id', async (req, res) => {
+    try {
+        const courseId = req.params.id;
+        console.log('[Delete] Deleting course:', courseId);
+
+        // 1. Delete associated files from storage
+        const { data: files, error: listError } = await supabase.storage
+            .from('course-assets')
+            .list(courseId, { recursive: true });
+        
+        if (!listError && files.length > 0) {
+            const filesToDelete = files.map(f => `${courseId}/${f.name}`);
+            await supabase.storage.from('course-assets').remove(filesToDelete);
+        }
+
+        // 2. Delete the record from database
+        const { error: dbError } = await supabase
+            .from('courses')
+            .delete()
+            .eq('id', courseId);
+
+        if (dbError) throw dbError;
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[Delete] Failed:', err.message);
+        res.status(500).json({ error: 'Deletion failed', details: err.message });
+    }
+});
+
 // Export Course (ZIP)
 const archiver = require('archiver');
 app.get('/api/course/:id/export', async (req, res) => {
