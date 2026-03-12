@@ -41,16 +41,27 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Diagnostics
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+    let tableInfo = null;
+    try {
+        const { data } = await supabase.from('courses').select('*').limit(1);
+        if (data && data.length > 0) {
+            tableInfo = {
+                columns: Object.keys(data[0]),
+                sampleId: data[0].id,
+                sampleOrg: data[0].org_id
+            };
+        }
+    } catch (e) {
+        tableInfo = { error: e.message };
+    }
+
     res.json({
         ok: true,
         env: process.env.NODE_ENV,
         supabaseUrl: !!supabaseUrl,
         supabaseKey: !!supabaseKey,
-        keyLength: supabaseKey ? supabaseKey.length : 0,
-        keyStart: supabaseKey ? supabaseKey.substring(0, 10) : 'EMPTY',
-        keyEnd: supabaseKey ? supabaseKey.substring(supabaseKey.length - 10) : 'EMPTY',
-        urlValue: supabaseUrl || 'EMPTY'
+        tableInfo
     });
 });
 
@@ -173,8 +184,8 @@ app.post('/api/courses/process-zip', async (req, res) => {
         // Add org_id if we found one (Required for your LMS)
         if (orgId) insertData.org_id = orgId;
         
-        console.log('[Process] Final insert data keys:', Object.keys(insertData));
-
+        console.log('[Process] Attempting DB insert with:', JSON.stringify(insertData).substring(0, 500) + '...');
+        
         const { error: dbError } = await supabase
             .from('courses')
             .insert(insertData);
