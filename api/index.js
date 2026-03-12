@@ -161,28 +161,36 @@ app.post('/api/courses/process-zip', async (req, res) => {
             courseData = await fs.readJson(dataJsonPath);
         }
 
-        // 6. DB Insert - Handle org_id for multi-tenant LMS tables
+        // 6. DB Insert - Simplified logic using discovered Org ID
         const dbId = generateUUID();
         
-        // Try to get an existing org_id from other courses to satisfy the NOT NULL constraint
-        let orgId = null;
-        const { data: existingCourses } = await supabase.from('courses').select('org_id').limit(1);
-        if (existingCourses && existingCourses.length > 0) {
-            orgId = existingCourses[0].org_id;
+        // Discovered Org ID from your environment
+        const HARDCODED_ORG_ID = "526d46ee-26ea-4b2f-9026-a579c64cccf2";
+        
+        // Try to get an existing org_id, fall back to discovered one
+        let orgId = HARDCODED_ORG_ID;
+        try {
+            const { data: existingCourses } = await supabase.from('courses').select('org_id').limit(1);
+            if (existingCourses && existingCourses.length > 0 && existingCourses[0].org_id) {
+                orgId = existingCourses[0].org_id;
+            }
+        } catch (e) {
+            console.log('[Process] Using fallback Org ID');
         }
 
-        console.log(`[Process] Attempting DB insert with UUID: ${dbId} and OrgID: ${orgId}`);
+        console.log(`[Process] Preparing DB insert for ${baseName} (Org: ${orgId})`);
         
         const insertData = { 
             id: dbId, 
+            org_id: orgId,
             name: baseName, 
             title: baseName,
             description: baseName || '',
-            data: courseData
+            data: courseData,
+            entry_point: 'index.html', // Common default for LMS
+            published: true,
+            category: 'General'
         };
-        
-        // Add org_id if we found one (Required for your LMS)
-        if (orgId) insertData.org_id = orgId;
         
         console.log('[Process] Attempting DB insert with:', JSON.stringify(insertData).substring(0, 500) + '...');
         
