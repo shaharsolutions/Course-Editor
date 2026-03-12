@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:3030/api';
+const API_BASE = window.location.origin.includes('localhost') ? 'http://localhost:3030/api' : '/api';
 let currentCourse = null;
 let currentCourseData = { screens: [] };
 let selectedSlideIndex = -1;
@@ -439,7 +439,7 @@ document.getElementById('export-btn').onclick = async () => {
         
         if (result.success) {
             showToast('הייצוא בוצע בהצלחה! מוריד כעת...');
-            window.location.href = `${API_BASE.replace('/api', '')}${result.downloadUrl}`;
+            window.location.href = result.downloadUrl; // result.downloadUrl is already full URL
         } else {
             showToast('שגיאה בייצוא', 'error');
         }
@@ -463,10 +463,10 @@ document.getElementById('preview-btn').onclick = () => {
     const bg = slideBg.value;
     const audio = audioPath.value;
     
-    // Construct URLs
-    const baseUrl = API_BASE.replace('/api', '') + '/exports/' + courseId + '/';
-    const bgUrl = bg ? (bg.startsWith('http') ? bg : baseUrl + bg) : '';
-    const audioUrl = audio ? (audio.startsWith('http') ? audio : baseUrl + audio) : '';
+    // Construct URLs for Supabase Storage
+    const storageUrl = `https://czfjbmkjnodonmtjvwep.supabase.co/storage/v1/object/public/course-assets/${courseId}/`;
+    const bgUrl = bg ? (bg.startsWith('http') ? bg : storageUrl + bg) : '';
+    const audioUrl = audio ? (audio.startsWith('http') ? audio : storageUrl + audio) : '';
     
     const characterImg = courseId.toLowerCase().includes('infosec') ? 'maya_guide.png' : 'mia_transparent_v4.png';
     const characterLabel = courseId.toLowerCase().includes('infosec') ? 'מיה - הממונה על אבטחת מידע' : 'מונה - הממונה על מניעת הטרדה מינית';
@@ -509,27 +509,9 @@ document.getElementById('preview-btn').onclick = () => {
     previewModal.classList.remove('hidden');
 };
 
-previewCourseBtn.onclick = async () => {
-    if (!currentCourse) return;
-    
-    // Save current changes first to ensure data.json is up to date
-    if (selectedSlideIndex !== -1) {
-        updateCurrentSlideData();
-    }
-    
-    showToast('שומר נתונים ופותח תצוגה מקדימה...', 'info');
-    await saveCourse();
-    
-    // Open the actual course index.html in a centered popup window
-    const baseUrl = API_BASE.replace('/api', '') + '/exports/' + currentCourse + '/index.html';
-    const width = 1280;
-    const height = 720;
-    const left = (window.screen.width / 2) - (width / 2);
-    const top = (window.screen.height / 2) - (height / 2);
-    
-    window.open(baseUrl, 'CoursePreview', 
-        `width=${width},height=${height},left=${left},top=${top},scrollbars=no,resizable=yes,status=no,location=no,toolbar=no,menubar=no`);
-};
+    previewCourseBtn.onclick = async () => {
+        showToast('תצוגה מקדימה מלאה זמינה רק לאחר ייצוא והעלאה לשרת, או בהרצה מקומית.', 'info');
+    };
 
 const closePreview = () => {
     previewModal.classList.add('hidden');
