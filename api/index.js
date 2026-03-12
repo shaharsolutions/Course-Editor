@@ -143,17 +143,35 @@ app.post('/api/courses/process-zip', async (req, res) => {
             courseData = await fs.readJson(dataJsonPath);
         }
 
-        // 6. DB Upsert - Use UUID for the database, but keep courseId for storage paths
+        // 6. DB Insert - Handle org_id for multi-tenant LMS tables
         const dbId = generateUUID();
+        
+        // Try to get an existing org_id from other courses to satisfy the NOT NULL constraint
+        let orgId = null;
+        const { data: existingCourses } = await supabase.from('courses').select('org_id').limit(1);
+        if (existingCourses && existingCourses.length > 0) {
+            orgId = existingCourses[0].org_id;
+        }
+
+        console.log(`[Process] Attempting DB insert with UUID: ${dbId} and OrgID: ${orgId}`);
+        
+        const insertData = { 
+            id: dbId, 
+            name: baseName, 
+            data: courseData
+        };
+        
+        // Only add org_id if we found one
+        if (orgId) insertData.org_id = orgId;
+
         const { error: dbError } = await supabase
             .from('courses')
-            .insert({ 
-                id: dbId, 
-                name: baseName, 
-                data: courseData
-            });
+            .insert(insertData);
 
-        if (dbError) throw new Error(`Database upsert failed: ${dbError.message}`);
+        if (dbError) {
+            console.error('[Supabase DB Error Detailed]', dbError);
+            throw new Error(`DB Error: ${dbError.message} | Details: ${dbError.details} | Hint: ${dbError.hint}`);
+        }
         console.log('[Process] Database updated successfully.');
         
         // Cleanup
