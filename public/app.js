@@ -17,7 +17,34 @@ if (window.supabase) {
 
 // --- Elements ---
 const courseSelector = document.getElementById('course-selector');
-// ... (rest of the element declarations)
+const slidesList = document.getElementById('slides-list');
+const editorForm = document.getElementById('editor-form');
+const noSelection = document.getElementById('no-selection');
+const saveBtn = document.getElementById('save-btn');
+const previewCourseBtn = document.getElementById('preview-course-btn');
+const toast = document.getElementById('toast');
+const selectAllSlides = document.getElementById('select-all-slides');
+const bulkActions = document.getElementById('bulk-actions');
+const bulkMinDelay = document.getElementById('bulk-min-delay');
+const applyBulkDelayBtn = document.getElementById('apply-bulk-delay');
+
+// Form Fields
+const slideTitle = document.getElementById('slide-title');
+const slideContent = document.getElementById('slide-content');
+const slideBg = document.getElementById('slide-bg');
+const audioUpload = document.getElementById('audio-upload');
+const audioFilename = document.getElementById('audio-filename');
+const audioPath = document.getElementById('audio-path');
+const waitForAudio = document.getElementById('wait-for-audio');
+const minDelay = document.getElementById('min-delay');
+const isQuestion = document.getElementById('is-question');
+const questionText = document.getElementById('question-text');
+const questionFields = document.getElementById('question-fields');
+const questionFeedback = document.getElementById('question-feedback');
+const optionsContainer = document.getElementById('options-container');
+const addOptionBtn = document.getElementById('add-option-btn');
+const uploadCourseBtn = document.getElementById('upload-course-btn');
+const courseFileInput = document.getElementById('course-file-input');
 
 // --- Initialization ---
 async function init() {
