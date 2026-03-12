@@ -2,10 +2,10 @@
   "name": "lms-course-editor",
   "version": "1.0.0",
   "description": "A modern editor for LMS course screens",
-  "main": "index.js",
+  "main": "api/index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node api/index.js",
+    "dev": "nodemon api/index.js"
   },
   "dependencies": {
     "@google-cloud/text-to-speech": "^6.4.0",
@@ -20,6 +20,9 @@
     "fs-extra": "^11.1.0",
     "multer": "^1.4.5-lts.1",
     "xlsx": "^0.18.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"

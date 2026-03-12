@@ -13,9 +13,13 @@ const app = express();
 const PORT = process.env.PORT || 3030;
 
 // Initialize Supabase
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+    console.error('CRITICAL: Missing Supabase environment variables!');
+}
+
 const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_ANON_KEY
+    process.env.SUPABASE_URL || 'https://placeholder.supabase.co',
+    process.env.SUPABASE_ANON_KEY || 'placeholder'
 );
 
 // We'll use /tmp for all temporary operations (Vercel friendly)
@@ -25,7 +29,7 @@ fs.ensureDirSync(UPLOADS_DIR);
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, '../public')));
 
 // Configure storage for audio files (Local temp before Supabase upload)
 const audioStorage = multer.diskStorage({
@@ -50,9 +54,16 @@ app.get('/api/courses', async (req, res) => {
             .select('id, name')
             .order('created_at', { ascending: false });
             
-        if (error) throw error;
+        if (error) {
+            console.error('Supabase error fetching courses:', error);
+            return res.status(500).json({ 
+                error: 'שגיאה בגישה לבסיס הנתונים. וודא שהגדרת את הטבלה לפי ההוראות.',
+                details: error.message 
+            });
+        }
         res.json(data || []);
     } catch (err) {
+        console.error('Server error:', err);
         res.status(500).json({ error: err.message });
     }
 });
