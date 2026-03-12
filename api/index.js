@@ -185,7 +185,7 @@ app.post('/api/courses/process-zip', async (req, res) => {
             supabase.storage.from('course-assets').remove([zipPath]).catch(() => {})
         ]);
 
-        res.json({ success: true, courseId });
+        res.json({ success: true, courseId: dbId });
     } catch (err) {
         console.error('[Error] process-zip failed:', err.message);
         res.status(500).json({ error: 'Processing failed', details: err.message });

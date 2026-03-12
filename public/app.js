@@ -133,8 +133,10 @@ courseSelector.addEventListener('change', async (e) => {
 
 async function loadCourse(courseId) {
     try {
+        console.log('[App] Loading course:', courseId);
         const response = await fetch(`${API_BASE}/course/${courseId}`);
         const data = await response.json();
+        console.log('[App] Course data received:', data);
         
         if (data.wasLegacy) {
             showToast('הלומדה הומרה מפורמט ישן. לחץ על שמירה כדי לקבע את השינויים.', 'info');
@@ -144,7 +146,6 @@ async function loadCourse(courseId) {
                 currentCourseData = { 
                     screens: [{ id: 'welcome', title: 'שקף חדש', content: 'תוכן כאן', bgImage: 'assets/scene_welcome.png' }] 
                 };
-                // Don't auto-save, let the user preview and click save
             } else {
                 return;
             }
@@ -152,9 +153,19 @@ async function loadCourse(courseId) {
             currentCourseData = data;
         }
         
+        if (!currentCourseData.screens) {
+            console.warn('[App] No screens found in course data, initializing empty array');
+            currentCourseData.screens = [];
+        }
+
+        console.log(`[App] Rendering ${currentCourseData.screens.length} screens`);
         renderSlidesList(currentCourseData.screens);
         if (currentCourseData.screens.length > 0) selectSlide(0);
+        else {
+            slidesList.innerHTML = '<li class="empty-list">אין שקופיות בלומדה זו</li>';
+        }
     } catch (err) {
+        console.error('[App] Load course failed:', err);
         showToast('נכשל בטעינת נתוני הלומדה', 'error');
     }
 }
