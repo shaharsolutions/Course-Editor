@@ -158,10 +158,15 @@ app.post('/api/courses/process-zip', async (req, res) => {
         const insertData = { 
             id: dbId, 
             name: baseName, 
+            title: baseName,
+            description: baseName,
+            category: 'כללי',
+            entry_file: 'index.html',
+            is_active: true,
             data: courseData
         };
         
-        // Only add org_id if we found one
+        // Add org_id if we found one
         if (orgId) insertData.org_id = orgId;
 
         const { error: dbError } = await supabase
