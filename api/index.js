@@ -92,63 +92,73 @@ app.post('/api/courses/process-zip', async (req, res) => {
     const localZip = path.join(os.tmpdir(), `${courseId}.zip`);
 
     try {
-        console.log(`[Process] Downloading ZIP: ${zipPath}`);
+        console.log(`[Process] Starting extraction for ${courseId}...`);
+        
+        // 1. Download
         const { data: blob, error: dlError } = await supabase.storage
             .from('course-assets')
             .download(zipPath);
-        
-        if (dlError) throw dlError;
+        if (dlError) throw new Error(`Download failed: ${dlError.message}`);
+        console.log('[Process] Downloaded ZIP from storage.');
 
         await fs.writeFile(localZip, Buffer.from(await blob.arrayBuffer()));
         
+        // 2. Extract
         const zip = new AdmZip(localZip);
         await fs.ensureDir(tempDir);
         zip.extractAllTo(tempDir, true);
+        console.log('[Process] Extracted files to temp directory.');
 
-        // Find root folder
+        // 3. Find root folder
         let root = tempDir;
         const sub = await fs.readdir(tempDir);
         if (sub.length === 1 && (await fs.stat(path.join(tempDir, sub[0]))).isDirectory()) {
             root = path.join(tempDir, sub[0]);
         }
 
-        // Upload files
+        // 4. Upload files (Parallel to save time)
         const files = await getFiles(root);
-        for (const f of files) {
+        console.log(`[Process] Uploading ${files.length} files...`);
+        
+        await Promise.all(files.map(async (f) => {
             const rel = path.relative(root, f);
             const content = await fs.readFile(f);
-            await supabase.storage.from('course-assets').upload(`${courseId}/${rel}`, content, { upsert: true });
-        }
+            const { error: upErr } = await supabase.storage
+                .from('course-assets')
+                .upload(`${courseId}/${rel}`, content, { upsert: true });
+            if (upErr) console.warn(`[Process] Warning: failed to upload ${rel}:`, upErr.message);
+        }));
+        console.log('[Process] Finished uploading assets.');
 
-        // DB
+        // 5. Extract metadata
         let courseData = { screens: [] };
-        if (await fs.pathExists(path.join(root, 'data.json'))) {
-            courseData = await fs.readJson(path.join(root, 'data.json'));
+        const dataJsonPath = path.join(root, 'data.json');
+        if (await fs.pathExists(dataJsonPath)) {
+            courseData = await fs.readJson(dataJsonPath);
         }
 
-        // DB - Use upsert to handle existing records and be more robust
+        // 6. DB Upsert (Minimal columns to avoid errors)
         const { error: dbError } = await supabase
             .from('courses')
             .upsert({ 
                 id: courseId, 
                 name: baseName, 
-                data: courseData,
-                updated_at: new Date().toISOString()
+                data: courseData
             }, { onConflict: 'id' });
 
-        if (dbError) {
-            console.error('[Supabase DB Error]', dbError);
-            throw new Error(`Database error: ${dbError.message} (Hint: ${dbError.hint || 'none'})`);
-        }
+        if (dbError) throw new Error(`Database upsert failed: ${dbError.message}`);
+        console.log('[Process] Database updated successfully.');
         
         // Cleanup
-        await fs.remove(tempDir).catch(() => {});
-        await fs.remove(localZip).catch(() => {});
-        await supabase.storage.from('course-assets').remove([zipPath]).catch(() => {});
+        await Promise.all([
+            fs.remove(tempDir).catch(() => {}),
+            fs.remove(localZip).catch(() => {}),
+            supabase.storage.from('course-assets').remove([zipPath]).catch(() => {})
+        ]);
 
         res.json({ success: true, courseId });
     } catch (err) {
-        console.error('[Error] process-zip:', err.message);
+        console.error('[Error] process-zip failed:', err.message);
         res.status(500).json({ error: 'Processing failed', details: err.message });
     }
 });
