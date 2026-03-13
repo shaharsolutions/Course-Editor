@@ -309,6 +309,15 @@ app.get('/api/course/:id/export', async (req, res) => {
         // Add data.json
         archive.append(JSON.stringify(course.data, null, 2), { name: 'data.json' });
 
+        // --- NEW: Add SCORM Template Files ---
+        const templateDir = path.join(__dirname, '../scorm-template');
+        if (await fs.pathExists(templateDir)) {
+            console.log('[Export] Adding SCORM template files...');
+            archive.directory(templateDir, false);
+        } else {
+            console.warn('[Export] SCORM template directory not found!');
+        }
+
         // Add files from storage in parallel batches to avoid overloading
         const downloadFile = async (file) => {
             if (file.name === '.emptyFolderPlaceholder') return;
