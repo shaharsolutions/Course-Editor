@@ -568,8 +568,8 @@ function showSlidePreview(index, isFull = false) {
         : '';
 
     const courseTitle = courseSelector.options[courseSelector.selectedIndex].text.toLowerCase();
-    const isHarassment = courseTitle.includes('הטרדה') || courseTitle.includes('מינית') || currentCourse.toLowerCase().includes('harass');
-    const isInfoSec = courseTitle.includes('אבטחת') || courseTitle.includes('מידע') || courseTitle.includes('פרטיות') || currentCourse.toLowerCase().includes('infosec');
+    const isHarassment = courseTitle.includes('הטרדה') || courseTitle.includes('מינית') || currentCourse.toLowerCase().includes('harass') || courseTitle.includes('harass');
+    const isInfoSec = courseTitle.includes('אבטחת') || courseTitle.includes('מידע') || courseTitle.includes('פרטיות') || currentCourse.toLowerCase().includes('infosec') || courseTitle.includes('infosec');
     
     const charImg = isInfoSec ? 'maya_guide.png' : 'mia_transparent_v4.png';
     const charLabel = isHarassment 
@@ -590,11 +590,12 @@ function showSlidePreview(index, isFull = false) {
                 <div class="mockup-label">${charLabel}</div>
             </div>
 
-            <div class="content-area-mockup">
+            <div class="content-area-mockup ${isQ ? 'question-mode' : ''}">
                 <div class="screen active">
-                    <h1>${isQ ? qText : title}</h1>
+                    <h1>${title}</h1>
+                    ${isQ ? `<p class="question-text">${qText}</p>` : ''}
                     <div class="content-body">
-                        <p>${isQ ? '' : content}</p>
+                        ${isQ ? '' : `<p>${content}</p>`}
                         ${optionsHtml}
                     </div>
                 </div>
