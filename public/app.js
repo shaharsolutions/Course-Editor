@@ -576,7 +576,9 @@ function showSlidePreview(index, isFull = false) {
         ? 'מונה - הממונה על מניעת הטרדה מינית' 
         : (isInfoSec ? 'מיה - הממונה על אבטחת מידע' : 'מיה - המדריכה שלך');
 
-    const progress = ((index + 1) / currentCourseData.screens.length) * 100;
+    const showPrev = isFull && index > 0;
+    const showNext = isFull && index < currentCourseData.screens.length - 1;
+    const isLast = isFull && index === currentCourseData.screens.length - 1;
 
     previewFrame.innerHTML = `
         <div class="course-mockup" style="background-image: url('${bgUrl}')">
@@ -601,13 +603,22 @@ function showSlidePreview(index, isFull = false) {
                 </div>
             </div>
             
-            <div class="mockup-nav-external">
-                <button class="mockup-btn" onclick="nextPreviewSlide()">
-                    ${isFull ? (index < currentCourseData.screens.length - 1 ? 'המשך' : 'סיום לומדה') : 'סגור תצוגה'}
-                </button>
+            <div class="mockup-nav-bar">
+                ${showPrev ? '<button class="mockup-btn mockup-btn-prev" onclick="prevPreviewSlide()">הקודם</button>' : ''}
+                ${isFull 
+                    ? (isLast 
+                        ? '<button class="mockup-btn" onclick="nextPreviewSlide()">סיום לומדה</button>'
+                        : '<button class="mockup-btn" onclick="nextPreviewSlide()">המשך</button>')
+                    : '<button class="mockup-btn" onclick="nextPreviewSlide()">סגור תצוגה</button>'
+                }
             </div>
         </div>
     `;
+
+    const progress = ((index + 1) / currentCourseData.screens.length) * 100;
+    // Update progress bar (find it in the already rendered HTML)
+    const progBar = previewFrame.querySelector('.mockup-progress-bar');
+    if (progBar) progBar.style.width = progress + '%';
 
     if (audioUrl && audioUrl !== storageUrl) {
         if (previewAudio) previewAudio.pause();
@@ -629,6 +640,12 @@ window.nextPreviewSlide = () => {
     } else {
         showToast('כל הכבוד! סיימת את הלומדה.', 'success');
         closePreview();
+    }
+};
+
+window.prevPreviewSlide = () => {
+    if (previewSlideIdx > 0) {
+        showSlidePreview(previewSlideIdx - 1, true);
     }
 };
 

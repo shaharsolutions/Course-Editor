@@ -473,6 +473,14 @@ input:checked + .slider:before {
     border: 1px solid var(--border-color);
 }
 
+/* Fullscreen preview modal */
+#preview-modal .modal-content {
+    width: 95vw;
+    max-width: none;
+    height: 90vh;
+    border-radius: 16px;
+}
+
 .confirm-dialog {
     padding: 35px;
     max-width: 450px;
@@ -512,7 +520,7 @@ input:checked + .slider:before {
 
 .preview-container {
     width: 100%;
-    aspect-ratio: 16 / 9;
+    height: 100%;
     background: #0f172a;
     position: relative;
     display: flex;
@@ -662,32 +670,46 @@ input:checked + .slider:before {
     border-radius: 4px;
     box-shadow: 0 0 15px rgba(56, 189, 248, 0.6);
 }
-/* Centered Navigation Button - Adjusted to be lower */
-.mockup-nav-external {
+/* Navigation Bar - Bottom Center */
+.mockup-nav-bar {
     position: absolute;
-    bottom: 30px;
-    left: 30%; 
+    bottom: 40px;
+    left: 50%;
     transform: translateX(-50%);
     z-index: 20;
+    display: flex;
+    gap: 15px;
+    align-items: center;
 }
 
 .mockup-btn {
-    padding: 12px 65px;
+    padding: 12px 50px;
     background: #0ea5e9;
     color: white;
     border-radius: 50px;
-    font-weight: 800;
-    font-size: 1.1rem;
+    font-weight: 700;
+    font-size: 1rem;
     border: none;
     cursor: pointer;
-    box-shadow: 0 10px 25px rgba(14, 165, 233, 0.4);
-    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 8px 20px rgba(14, 165, 233, 0.4);
+    transition: all 0.2s ease;
 }
 
 .mockup-btn:hover {
-    background: #0091ea;
+    background: #0284c7;
     transform: translateY(-2px);
-    box-shadow: 0 15px 30px rgba(0, 176, 255, 0.4);
+    box-shadow: 0 12px 30px rgba(14, 165, 233, 0.5);
+}
+
+.mockup-btn-prev {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: none;
+}
+
+.mockup-btn-prev:hover {
+    background: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
 }
 
 
