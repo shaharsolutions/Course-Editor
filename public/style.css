@@ -569,14 +569,10 @@ input:checked + .slider:before {
 }
 
 .mockup-character-img {
-    width: 280%; 
-    height: auto;
-    /* Using transform instead of top for better centering */
-    position: absolute;
-    top: 35%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    object-fit: contain;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 15%; /* Focus on the head/face area at the top of the image */
 }
 
 .mockup-label {
