@@ -8,6 +8,7 @@ const path = require('path');
 const fs = require('fs-extra');
 const os = require('os');
 const crypto = require('crypto');
+const archiver = require('archiver');
 
 // Generate proper UUID v4
 function generateUUID() {
@@ -20,218 +21,109 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// Static files - Vercel serves from /public by default, but we help it
+// Static files
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Initialize Supabase safely with aggressive cleaning
+// Initialize Supabase
 const cleanEnv = (val) => {
     if (!val) return '';
-    let cleaned = val.replace(/[\r\n\t]/g, '').trim();
-    // Fix common copy-paste error where PORT=3030 is appended
-    cleaned = cleaned.replace(/PORT=\d+.*$/i, '').trim();
-    return cleaned;
+    return val.replace(/[\r\n\t]/g, '').trim().replace(/PORT=\d+.*$/i, '').trim();
 };
 const supabaseUrl = cleanEnv(process.env.SUPABASE_URL);
 const supabaseKey = cleanEnv(process.env.SUPABASE_ANON_KEY);
-
-if (!supabaseUrl || !supabaseKey) {
-    console.error('[CRITICAL] Missing Supabase environment variables!');
-}
-
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Diagnostics
-app.get('/api/health', async (req, res) => {
-    let tableInfo = null;
-    try {
-        const { data } = await supabase.from('courses').select('*').limit(1);
-        if (data && data.length > 0) {
-            tableInfo = {
-                columns: Object.keys(data[0]),
-                sampleId: data[0].id,
-                sampleOrg: data[0].org_id
-            };
-        }
-    } catch (e) {
-        tableInfo = { error: e.message };
-    }
+// --- API Endpoints ---
 
-    res.json({
-        ok: true,
-        env: process.env.NODE_ENV,
-        supabaseUrl: !!supabaseUrl,
-        supabaseKey: !!supabaseKey,
-        tableInfo
-    });
+// Health check
+app.get('/api/health', async (req, res) => {
+    res.json({ ok: true, supabaseUrl: !!supabaseUrl });
 });
 
-// API: List courses
+// List courses
 app.get('/api/courses', async (req, res) => {
     try {
-        if (!supabaseUrl || !supabaseKey) {
-            return res.status(503).json({ error: 'Supabase credentials missing' });
-        }
-        
-        // Try to be smart: first try id, name. If it fails, try to get anything.
         const { data, error } = await supabase
             .from('courses')
-            .select('*') // Select all to see what we have
+            .select('*')
             .limit(50)
             .order('created_at', { ascending: false });
             
-        if (error) {
-            console.error('[Supabase Error] courses:', error);
-            // If the table is missing or columns are wrong
-            return res.status(500).json({ 
-                error: 'Database query failed', 
-                message: error.message,
-                hint: 'Check if table "courses" exists and has columns id, name, data' 
-            });
-        }
-
-        // Map the results to ensure we have id and name
+        if (error) throw error;
         const mappedData = (data || []).map(item => ({
-            id: item.id || item.course_id || item.ID,
-            name: item.name || item.title || item.CourseName || item.id
+            id: item.id || item.course_id,
+            name: item.name || item.title || item.id
         }));
-
         res.json(mappedData);
     } catch (err) {
-        console.error('[Error] GET /api/courses:', err.message);
-        res.status(500).json({ error: 'Internal server error', details: err.message });
+        res.status(500).json({ error: err.message });
     }
 });
 
-// API: Process ZIP
+// Process ZIP
 app.post('/api/courses/process-zip', async (req, res) => {
     const { courseId, baseName, zipPath } = req.body;
     const tempDir = path.join(os.tmpdir(), `extract_${courseId}`);
     const localZip = path.join(os.tmpdir(), `${courseId}.zip`);
 
     try {
-        console.log(`[Process] Starting extraction for ${courseId}...`);
-        
-        // 1. Download
-        const { data: blob, error: dlError } = await supabase.storage
-            .from('course-assets')
-            .download(zipPath);
-        if (dlError) throw new Error(`Download failed: ${dlError.message}`);
-        console.log('[Process] Downloaded ZIP from storage.');
-
+        const { data: blob, error: dlError } = await supabase.storage.from('course-assets').download(zipPath);
+        if (dlError) throw dlError;
         await fs.writeFile(localZip, Buffer.from(await blob.arrayBuffer()));
         
-        // 2. Extract
         const zip = new AdmZip(localZip);
         await fs.ensureDir(tempDir);
         zip.extractAllTo(tempDir, true);
-        console.log('[Process] Extracted files to temp directory.');
 
-        // 3. Generate the final DB ID now so we can use it for storage path
         const dbId = generateUUID();
-        console.log(`[Process] Using UUID for storage: ${dbId}`);
-
-        // 4. Find root folder
         let root = tempDir;
         const sub = await fs.readdir(tempDir);
         if (sub.length === 1 && (await fs.stat(path.join(tempDir, sub[0]))).isDirectory()) {
             root = path.join(tempDir, sub[0]);
         }
 
-        // 5. Upload files (Parallel to save time)
+        const getFiles = async (dir) => {
+            const items = await fs.readdir(dir, { withFileTypes: true });
+            const childFiles = await Promise.all(items.map(s => {
+                const p = path.resolve(dir, s.name);
+                return s.isDirectory() ? getFiles(p) : p;
+            }));
+            return Array.prototype.concat(...childFiles);
+        };
+
         const files = await getFiles(root);
-        console.log(`[Process] Uploading ${files.length} files to folder ${dbId}...`);
-        
         await Promise.all(files.map(async (f) => {
             const rel = path.relative(root, f);
             const content = await fs.readFile(f);
-            const { error: upErr } = await supabase.storage
-                .from('course-assets')
-                .upload(`${dbId}/${rel}`, content, { upsert: true });
-            if (upErr) console.warn(`[Process] Warning: failed to upload ${rel}:`, upErr.message);
+            await supabase.storage.from('course-assets').upload(`${dbId}/${rel}`, content, { upsert: true });
         }));
-        console.log('[Process] Finished uploading assets.');
 
-        // 5. Extract metadata
-        let courseData = { 
-            screens: [{ 
-                id: 'slide_' + Date.now(), 
-                title: 'שקף פתיחה', 
-                content: 'ברוכים הבאים ללומדה החדשה שלך! ניתן לערוך את התוכן כאן.', 
-                bgImage: '' 
-            }] 
-        };
+        let courseData = { screens: [] };
         const dataJsonPath = path.join(root, 'data.json');
-        if (await fs.pathExists(dataJsonPath)) {
-            courseData = await fs.readJson(dataJsonPath);
-        }
+        if (await fs.pathExists(dataJsonPath)) courseData = await fs.readJson(dataJsonPath);
 
-        // 6. DB Insert - Simplified logic using discovered Org ID
-        // dbId is already defined above
-        
-        // Discovered Org ID from your environment
         const HARDCODED_ORG_ID = "526d46ee-26ea-4b2f-9026-a579c64cccf2";
-        
-        // Try to get an existing org_id, fall back to discovered one
-        let orgId = HARDCODED_ORG_ID;
-        try {
-            const { data: existingCourses } = await supabase.from('courses').select('org_id').limit(1);
-            if (existingCourses && existingCourses.length > 0 && existingCourses[0].org_id) {
-                orgId = existingCourses[0].org_id;
-            }
-        } catch (e) {
-            console.log('[Process] Using fallback Org ID');
-        }
-
-        console.log(`[Process] Preparing DB insert for ${baseName} (Org: ${orgId})`);
-        
-        const insertData = { 
-            id: dbId, 
-            org_id: orgId,
-            name: baseName, 
+        const { error: dbError } = await supabase.from('courses').insert({
+            id: dbId,
+            org_id: HARDCODED_ORG_ID,
+            name: baseName,
             title: baseName,
-            description: baseName || '',
             data: courseData,
-            entry_point: 'index.html', // Common default for LMS
-            published: true,
-            category: 'General'
-        };
-        
-        console.log('[Process] Attempting DB insert with:', JSON.stringify(insertData).substring(0, 500) + '...');
-        
-        const { error: dbError } = await supabase
-            .from('courses')
-            .insert(insertData);
+            entry_point: 'index.html',
+            published: true
+        });
 
-        if (dbError) {
-            console.error('[Supabase DB Error Detailed]', dbError);
-            throw new Error(`DB Error: ${dbError.message} | Details: ${dbError.details} | Hint: ${dbError.hint}`);
-        }
-        console.log('[Process] Database updated successfully.');
-        
-        // Cleanup
-        await Promise.all([
-            fs.remove(tempDir).catch(() => {}),
-            fs.remove(localZip).catch(() => {}),
-            supabase.storage.from('course-assets').remove([zipPath]).catch(() => {})
-        ]);
-
+        if (dbError) throw dbError;
         res.json({ success: true, courseId: dbId });
     } catch (err) {
-        console.error('[Error] process-zip failed:', err.message);
-        res.status(500).json({ error: 'Processing failed', details: err.message });
+        res.status(500).json({ error: err.message });
+    } finally {
+        fs.remove(tempDir).catch(() => {});
+        fs.remove(localZip).catch(() => {});
     }
 });
 
-async function getFiles(dir) {
-    const sub = await fs.readdir(dir, { withFileTypes: true });
-    const res = await Promise.all(sub.map((s) => {
-        const p = path.resolve(dir, s.name);
-        return s.isDirectory() ? getFiles(p) : p;
-    }));
-    return Array.prototype.concat(...res);
-}
-
-// Course Data (GET/POST)
+// Course Data
 app.get('/api/course/:id', async (req, res) => {
     const { data, error } = await supabase.from('courses').select('data').eq('id', req.params.id).single();
     if (error) return res.status(500).json({ error: error.message });
@@ -246,116 +138,84 @@ app.post('/api/course/:id', async (req, res) => {
 
 // Delete Course
 app.delete('/api/course/:id', async (req, res) => {
-    try {
-        const courseId = req.params.id;
-        console.log('[Delete] Deleting course:', courseId);
-
-        // 1. Delete associated files from storage
-        const { data: files, error: listError } = await supabase.storage
-            .from('course-assets')
-            .list(courseId, { recursive: true });
-        
-        if (!listError && files.length > 0) {
-            const filesToDelete = files.map(f => `${courseId}/${f.name}`);
-            await supabase.storage.from('course-assets').remove(filesToDelete);
-        }
-
-        // 2. Delete the record from database
-        const { error: dbError } = await supabase
-            .from('courses')
-            .delete()
-            .eq('id', courseId);
-
-        if (dbError) throw dbError;
-
-        res.json({ success: true });
-    } catch (err) {
-        console.error('[Delete] Failed:', err.message);
-        res.status(500).json({ error: 'Deletion failed', details: err.message });
+    const { data: files } = await supabase.storage.from('course-assets').list(req.params.id, { recursive: true });
+    if (files && files.length > 0) {
+        await supabase.storage.from('course-assets').remove(files.map(f => `${req.params.id}/${f.name}`));
     }
+    await supabase.from('courses').delete().eq('id', req.params.id);
+    res.json({ success: true });
 });
 
-// Export Course (ZIP)
-const archiver = require('archiver');
+// Export SCORM (Dynamic Manifest)
 app.get('/api/course/:id/export', async (req, res) => {
     try {
         const courseId = req.params.id;
-        console.log('[Export] Exporting course:', courseId);
-
-        const { data: course, error: dbError } = await supabase
-            .from('courses')
-            .select('name, data')
-            .eq('id', courseId)
-            .single();
-
-        if (dbError || !course) throw new Error('Course not found');
-
-        // List files in storage - Increased limit for complex courses
-        const { data: storageFiles, error: storageError } = await supabase.storage
-            .from('course-assets')
-            .list(courseId, { 
-                recursive: true,
-                limit: 1000 // Handle larger courses
-            });
-
-        if (storageError) throw storageError;
+        const { data: course } = await supabase.from('courses').select('name, data').eq('id', courseId).single();
+        const { data: storageFiles } = await supabase.storage.from('course-assets').list(courseId, { recursive: true, limit: 1000 });
 
         res.setHeader('Content-Type', 'application/zip');
         res.setHeader('Content-Disposition', `attachment; filename="${course.name || 'course'}.zip"`);
 
         const archive = archiver('zip', { zlib: { level: 9 } });
         archive.pipe(res);
+        const exportedFiles = [];
 
-        // Add data.json
+        // 1. data.json
         archive.append(JSON.stringify(course.data, null, 2), { name: 'data.json' });
+        exportedFiles.push('data.json');
 
-        // --- NEW: Add SCORM Template Files ---
+        // 2. Template Files
         const templateDir = path.join(__dirname, '../scorm-template');
         if (await fs.pathExists(templateDir)) {
-            console.log('[Export] Adding SCORM template files...');
-            archive.directory(templateDir, false);
-        } else {
-            console.warn('[Export] SCORM template directory not found!');
+            const files = await fs.readdir(templateDir);
+            for (const file of files) {
+                if (file === 'imsmanifest.xml') continue; 
+                const fullPath = path.join(templateDir, file);
+                const stat = await fs.stat(fullPath);
+                if (stat.isFile()) {
+                    archive.file(fullPath, { name: file });
+                    exportedFiles.push(file);
+                } else if (file === 'assets') {
+                    const assetFiles = await fs.readdir(fullPath);
+                    for (const f of assetFiles) {
+                        archive.file(path.join(fullPath, f), { name: `assets/${f}` });
+                        exportedFiles.push(`assets/${f}`);
+                    }
+                }
+            }
         }
 
-        // Add files from storage in parallel batches to avoid overloading
+        // 3. Storage Files
         const downloadFile = async (file) => {
             if (file.name === '.emptyFolderPlaceholder') return;
-            try {
-                const { data: fileData, error: dlError } = await supabase.storage
-                    .from('course-assets')
-                    .download(`${courseId}/${file.name}`);
-                
-                if (!dlError) {
-                    archive.append(Buffer.from(await fileData.arrayBuffer()), { name: file.name });
-                }
-            } catch (e) {
-                console.warn(`[Export] Failed to add file ${file.name}:`, e.message);
+            const { data: fileData } = await supabase.storage.from('course-assets').download(`${courseId}/${file.name}`);
+            if (fileData) {
+                archive.append(Buffer.from(await fileData.arrayBuffer()), { name: file.name });
+                exportedFiles.push(file.name);
             }
         };
-
-        // Process in small batches to stay within safe memory/timeout limits
         for (let i = 0; i < storageFiles.length; i += 10) {
-            const batch = storageFiles.slice(i, i + 10);
-            await Promise.all(batch.map(downloadFile));
+            await Promise.all(storageFiles.slice(i, i + 10).map(downloadFile));
         }
 
+        // 4. Manifest
+        const manifest = `<?xml version="1.0" encoding="UTF-8"?>
+<manifest identifier="Course_${Date.now()}" version="1.0" xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2" xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd http://www.imsglobal.org/xsd/imsmd_rootv1p2 imsmd_rootv1p2.xsd http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd">
+    <metadata><schema>ADL SCORM</schema><schemaversion>1.2</schemaversion></metadata>
+    <organizations default="ORG_1"><organization identifier="ORG_1"><title>${course.name}</title><item identifier="ITEM_1" identifierref="RES_1"><title>${course.name}</title></item></organization></organizations>
+    <resources><resource identifier="RES_1" type="webcontent" adlcp:scormtype="sco" href="index.html">
+        ${exportedFiles.map(f => `<file href="${f}"/>`).join('\n        ')}
+    </resource></resources>
+</manifest>`;
+        archive.append(manifest, { name: 'imsmanifest.xml' });
         await archive.finalize();
-        console.log('[Export] Export finished.');
     } catch (err) {
-        console.error('[Export] Failed:', err.message);
-        if (!res.headersSent) {
-            res.status(500).send('Export failed: ' + err.message);
-        }
+        console.error(err);
+        if (!res.headersSent) res.status(500).send('Export failed');
     }
 });
 
 module.exports = app;
-
-// Add local listener if not running on Vercel
 if (require.main === module) {
-    const PORT = process.env.PORT || 3030;
-    app.listen(PORT, () => {
-        console.log(`[Server] Editor backend running locally at http://localhost:${PORT}`);
-    });
+    app.listen(process.env.PORT || 3030, () => console.log('Server running'));
 }
