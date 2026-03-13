@@ -579,6 +579,7 @@ function showSlidePreview(index, isFull = false) {
     const showPrev = isFull && index > 0;
     const showNext = isFull && index < currentCourseData.screens.length - 1;
     const isLast = isFull && index === currentCourseData.screens.length - 1;
+    const progress = ((index + 1) / currentCourseData.screens.length) * 100;
 
     previewFrame.innerHTML = `
         <div class="course-mockup" style="background-image: url('${bgUrl}')">
@@ -614,11 +615,6 @@ function showSlidePreview(index, isFull = false) {
             </div>
         </div>
     `;
-
-    const progress = ((index + 1) / currentCourseData.screens.length) * 100;
-    // Update progress bar (find it in the already rendered HTML)
-    const progBar = previewFrame.querySelector('.mockup-progress-bar');
-    if (progBar) progBar.style.width = progress + '%';
 
     if (audioUrl && audioUrl !== storageUrl) {
         if (previewAudio) previewAudio.pause();
