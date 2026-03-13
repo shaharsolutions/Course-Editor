@@ -542,58 +542,63 @@ input:checked + .slider:before {
     z-index: 1;
 }
 
-/* Character Positioning - Left side for RTL balance */
-.mockup-character-container {
+/* Character Section - Circle Layout */
+.mockup-character-section {
     position: absolute;
-    bottom: -20px;
-    left: 2%;
-    width: 40%;
-    max-width: 500px;
-    height: 105%;
+    bottom: 50px;
+    right: 15%;
     z-index: 5;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-end;
-    pointer-events: none;
+    gap: 15px;
+}
+
+.mockup-character-circle {
+    width: 250px;
+    height: 250px;
+    border-radius: 50%;
+    border: 3px solid #00b0ff;
+    overflow: hidden;
+    background: #1e293b;
+    box-shadow: 0 0 40px rgba(0, 176, 255, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .mockup-character-img {
-    height: 95%;
+    height: 100%;
     width: auto;
-    filter: drop-shadow(0 20px 60px rgba(0,0,0,0.7));
-    object-fit: contain;
+    object-fit: cover;
+    object-position: center top;
 }
 
 .mockup-label {
-    background: rgba(15, 23, 42, 0.95);
-    color: #38bdf8;
-    padding: 10px 24px;
-    border-radius: 50px;
-    font-size: 0.95rem;
-    border: 1px solid rgba(56, 189, 248, 0.4);
+    background: rgba(15, 23, 42, 0.9);
+    color: #00b0ff;
+    padding: 6px 16px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    border: 1px solid rgba(0, 176, 255, 0.2);
     white-space: nowrap;
-    margin-bottom: 60px;
-    font-weight: 800;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    backdrop-filter: blur(10px);
+    text-align: center;
+    font-weight: 600;
 }
 
-/* Content Area - Right side for RTL */
+/* Content Card Layout */
 .content-area-mockup {
     position: absolute;
     top: 50%;
-    right: 8%;
+    left: 15%;
     transform: translateY(-50%);
-    width: 42%;
-    max-width: 650px;
-    background: rgba(15, 23, 42, 0.82);
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 48px;
-    padding: 60px;
-    box-shadow: 0 50px 120px -20px rgba(0, 0, 0, 0.8);
+    width: 35%;
+    max-width: 500px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
     z-index: 10;
     display: flex;
     flex-direction: column;
@@ -602,63 +607,68 @@ input:checked + .slider:before {
 }
 
 .content-area-mockup h1 {
-    font-size: 3rem;
-    margin-bottom: 35px;
-    color: #fff;
-    line-height: 1.1;
-    font-weight: 900;
-    text-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    font-size: 2.2rem;
+    margin-bottom: 20px;
+    color: #00b0ff;
+    line-height: 1.2;
+    font-weight: 800;
 }
 
 .content-body p {
-    font-size: 1.45rem;
-    line-height: 1.75;
-    color: #f1f5f9;
+    font-size: 1.25rem;
+    line-height: 1.6;
+    color: #e2e8f0;
     font-weight: 400;
 }
 
 /* Progress Bar */
 .mockup-progress-container {
     position: absolute;
-    top: 30px;
+    top: 20px;
     left: 50%;
     transform: translateX(-50%);
     width: 60%;
-    height: 8px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
     z-index: 5;
 }
 
 .mockup-progress-bar {
-    width: 40%;
     height: 100%;
-    background: linear-gradient(90deg, #38bdf8, #818cf8);
-    border-radius: 10px;
+    background: #00b0ff;
+    border-radius: 4px;
+    box-shadow: 0 0 10px rgba(0, 176, 255, 0.5);
 }
-.mockup-nav-internal {
-    margin-top: 40px;
-    display: flex;
-    justify-content: center;
+/* External Navigation Button */
+.mockup-nav-external {
+    position: absolute;
+    bottom: 50px;
+    left: 32.5%; /* Positioned below the content card */
+    transform: translateX(-50%);
+    z-index: 20;
 }
 
 .mockup-btn {
-    padding: 16px 80px;
-    background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+    padding: 12px 60px;
+    background: #00b0ff;
     color: white;
-    border-radius: 50px;
+    border-radius: 30px;
     font-weight: 800;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     border: none;
     cursor: pointer;
-    box-shadow: 0 15px 30px rgba(14, 165, 233, 0.4);
-    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 10px 20px rgba(0, 176, 255, 0.3);
+    transition: all 0.3s ease;
 }
 
 .mockup-btn:hover {
-    transform: scale(1.05) translateY(-5px);
-    box-shadow: 0 20px 40px rgba(14, 165, 233, 0.5);
+    background: #0091ea;
+    transform: translateY(-2px);
+    box-shadow: 0 15px 30px rgba(0, 176, 255, 0.4);
 }
+
+
 
 /* Question Options */
 .mockup-options {

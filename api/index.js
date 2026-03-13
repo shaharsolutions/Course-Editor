@@ -342,3 +342,11 @@ app.get('/api/course/:id/export', async (req, res) => {
 });
 
 module.exports = app;
+
+// Add local listener if not running on Vercel
+if (require.main === module) {
+    const PORT = process.env.PORT || 3030;
+    app.listen(PORT, () => {
+        console.log(`[Server] Editor backend running locally at http://localhost:${PORT}`);
+    });
+}

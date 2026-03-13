@@ -532,45 +532,61 @@ const previewFrame = document.getElementById('preview-frame');
 const closeModal = document.querySelector('.close-modal');
 let previewAudio = null;
 
-document.getElementById('preview-btn').onclick = () => {
-    if (selectedSlideIndex === -1) return;
+// --- Preview Logic ---
+let previewSlideIdx = 0;
+let isFullPreview = false;
+
+function showSlidePreview(index, isFull = false) {
+    if (!currentCourseData.screens || currentCourseData.screens.length === 0) {
+        showToast('אין שקפים לתצוגה', 'info');
+        return;
+    }
     
-    const courseId = currentCourse;
-    const title = slideTitle.value;
-    const content = slideContent.value;
-    const bg = slideBg.value;
-    const audio = audioPath.value;
-    const storageUrl = `https://czfjbmkjnodonmtjvwep.supabase.co/storage/v1/object/public/course-assets/${courseId}/`;
+    previewSlideIdx = index;
+    isFullPreview = isFull;
+    
+    const screen = currentCourseData.screens[index];
+    if (!screen) return;
+
+    // Use current input values ONLY if it's a single slide preview for the currently selected slide
+    const isEditingThisSlide = !isFull && index === selectedSlideIndex;
+    const title = isEditingThisSlide ? slideTitle.value : (screen.title || '');
+    const content = isEditingThisSlide ? slideContent.value : (screen.content || '');
+    const bg = isEditingThisSlide ? slideBg.value : (screen.bgImage || '');
+    const audio = isEditingThisSlide ? audioPath.value : (screen.audio || '');
+    const isQ = isEditingThisSlide ? isQuestion.checked : !!(screen.question && screen.question.text);
+    const qText = isEditingThisSlide ? questionText.value : (screen.question ? screen.question.text : '');
+
+    const storageUrl = `https://czfjbmkjnodonmtjvwep.supabase.co/storage/v1/object/public/course-assets/${currentCourse}/`;
     const bgUrl = bg ? (bg.startsWith('http') ? bg : storageUrl + bg) : '';
     const audioUrl = audio ? (audio.startsWith('http') ? audio : storageUrl + audio) : '';
-    const isQ = isQuestion.checked;
-    const qText = questionText.value;
-    const screenData = currentCourseData.screens[selectedSlideIndex];
-    const optionsHtml = (isQ && screenData.question && screenData.question.options) 
+
+    const optionsHtml = (isQ && screen.question && screen.question.options) 
         ? `<div class="mockup-options">
-            ${screenData.question.options.map(opt => `<div class="mockup-option">${opt.text || 'אפשרות ריקה'}</div>`).join('')}
+            ${screen.question.options.map(opt => `<div class="mockup-option">${opt.text || 'אפשרות ריקה'}</div>`).join('')}
           </div>` 
         : '';
 
-    // Inject HTML
-    // Refined character detection
     const courseTitle = courseSelector.options[courseSelector.selectedIndex].text.toLowerCase();
-    const isSexualHarassment = courseTitle.includes('הטרדה') || courseTitle.includes('מינית') || courseId.toLowerCase().includes('harass');
-    const isInfoSec = courseTitle.includes('אבטחת') || courseTitle.includes('מידע') || courseTitle.includes('פרטיות') || courseId.toLowerCase().includes('infosec');
+    const isHarassment = courseTitle.includes('הטרדה') || courseTitle.includes('מינית') || currentCourse.toLowerCase().includes('harass');
+    const isInfoSec = courseTitle.includes('אבטחת') || courseTitle.includes('מידע') || courseTitle.includes('פרטיות') || currentCourse.toLowerCase().includes('infosec');
     
-    // Default to Monica (Mona) if not specified, but prefer Maya for Infosec
     const charImg = isInfoSec ? 'maya_guide.png' : 'mia_transparent_v4.png';
-    const charLabel = isSexualHarassment 
+    const charLabel = isHarassment 
         ? 'מונה - הממונה על מניעת הטרדה מינית' 
         : (isInfoSec ? 'מיה - הממונה על אבטחת מידע' : 'מיה - המדריכה שלך');
+
+    const progress = ((index + 1) / currentCourseData.screens.length) * 100;
 
     previewFrame.innerHTML = `
         <div class="course-mockup" style="background-image: url('${bgUrl}')">
             <div class="background-overlay"></div>
-            <div class="mockup-progress-container"><div class="mockup-progress-bar"></div></div>
+            <div class="mockup-progress-container"><div class="mockup-progress-bar" style="width: ${progress}%"></div></div>
             
-            <div class="mockup-character-container">
-                <img src="${baseUrl}assets/${charImg}" class="mockup-character-img">
+            <div class="mockup-character-section">
+                <div class="mockup-character-circle">
+                    <img src="${baseUrl}assets/${charImg}" class="mockup-character-img">
+                </div>
                 <div class="mockup-label">${charLabel}</div>
             </div>
 
@@ -582,14 +598,16 @@ document.getElementById('preview-btn').onclick = () => {
                         ${optionsHtml}
                     </div>
                 </div>
-                <div class="mockup-nav-internal">
-                    <button class="mockup-btn">${isQ ? 'בדוק תשובה' : 'המשך'}</button>
-                </div>
+            </div>
+            
+            <div class="mockup-nav-external">
+                <button class="mockup-btn" onclick="nextPreviewSlide()">
+                    ${isFull ? (index < currentCourseData.screens.length - 1 ? 'המשך' : 'סיום לומדה') : 'סגור תצוגה'}
+                </button>
             </div>
         </div>
     `;
-    
-    // Play Audio
+
     if (audioUrl && audioUrl !== storageUrl) {
         if (previewAudio) previewAudio.pause();
         previewAudio = new Audio(audioUrl);
@@ -597,13 +615,34 @@ document.getElementById('preview-btn').onclick = () => {
     }
     
     previewModal.classList.remove('hidden');
+}
+
+window.nextPreviewSlide = () => {
+    if (!isFullPreview) {
+        closePreview();
+        return;
+    }
+    
+    if (previewSlideIdx < currentCourseData.screens.length - 1) {
+        showSlidePreview(previewSlideIdx + 1, true);
+    } else {
+        showToast('כל הכבוד! סיימת את הלומדה.', 'success');
+        closePreview();
+    }
 };
 
-    previewCourseBtn.onclick = async () => {
-        if (!currentCourse) return;
-        window.open(`${API_BASE}/course/${currentCourse}/export`, '_blank');
-        showToast('מכין הורדה...', 'info');
-    };
+document.getElementById('preview-btn').onclick = () => {
+    if (selectedSlideIndex === -1) {
+        showToast('בחר שקף לתצוגה', 'info');
+        return;
+    }
+    showSlidePreview(selectedSlideIndex, false);
+};
+
+previewCourseBtn.onclick = () => {
+    if (!currentCourse) return;
+    showSlidePreview(0, true);
+};
 
 const closePreview = () => {
     previewModal.classList.add('hidden');
