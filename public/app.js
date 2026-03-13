@@ -593,6 +593,11 @@ function showSlidePreview(index, isFull = false) {
         return;
     }
     
+    // Only reset mockup state if moving to a DIFFERENT slide OR opening preview fresh
+    if (index !== previewSlideIdx || previewModal.classList.contains('hidden')) {
+        selectedMockupIndex = -1;
+        hasSubmittedAnswer = false;
+    }
     previewSlideIdx = index;
     isFullPreview = isFull;
     
@@ -617,14 +622,6 @@ function showSlidePreview(index, isFull = false) {
             ${screen.question.options.map((opt, i) => `<div class="mockup-option" onclick="selectMockupOption(${i})">${opt.text || 'אפשרות ריקה'}</div>`).join('')}
           </div>` 
         : '';
-
-    if (index !== previewSlideIdx || !previewModal.classList.contains('hidden')) {
-        // Only reset if moving to a DIFFERENT slide
-        if (index !== previewSlideIdx) {
-            selectedMockupIndex = -1;
-            hasSubmittedAnswer = false;
-        }
-    }
 
     const courseTitle = courseSelector.options[courseSelector.selectedIndex].text.toLowerCase();
     const isHarassment = courseTitle.includes('הטרדה') || courseTitle.includes('מינית') || currentCourse.toLowerCase().includes('harass') || courseTitle.includes('harass');

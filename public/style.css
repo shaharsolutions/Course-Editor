@@ -43,6 +43,10 @@ body {
     line-height: 1.5;
 }
 
+.hidden {
+    display: none !important;
+}
+
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
     width: 6px;
@@ -670,6 +674,13 @@ input:checked + .slider:before {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+#upload-modal .modal-content {
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .correct-toggle {
