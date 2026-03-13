@@ -79,6 +79,15 @@ async function init() {
     }
 }
 
+// Update the breadcrumb
+function updateBreadcrumb() {
+    const breadcrumb = document.getElementById('course-name-breadcrumb');
+    if (breadcrumb && currentCourse) {
+        const name = courseSelector.options[courseSelector.selectedIndex]?.text || currentCourse;
+        breadcrumb.textContent = `עורך לומדה: ${name}`;
+    }
+}
+
 // Course Upload Logic (Direct to Supabase to bypass Vercel 4.5MB limit)
 if (uploadCourseBtn) {
     uploadCourseBtn.onclick = () => courseFileInput.click();
@@ -178,6 +187,7 @@ courseSelector.addEventListener('change', async (e) => {
     
     currentCourse = courseId;
     selectedSlidesIndices.clear();
+    updateBreadcrumb();
     loadCourse(courseId);
 });
 
@@ -243,14 +253,16 @@ function renderSlidesList(screens) {
         leftSide.appendChild(checkbox);
 
         const titleSpan = document.createElement('span');
-        titleSpan.textContent = `${index + 1}. ${screen.title || 'שקף ללא כותרת'}`;
+        titleSpan.className = 'slide-title-text';
+        titleSpan.textContent = screen.title || 'שקף ללא כותרת';
         leftSide.appendChild(titleSpan);
         
         li.appendChild(leftSide);
         
         const deleteBtn = document.createElement('button');
-        deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+        deleteBtn.innerHTML = '<i class="far fa-trash-alt"></i>';
         deleteBtn.className = 'delete-slide-btn';
+        deleteBtn.title = 'מחק שקף';
         deleteBtn.onclick = (e) => {
             e.stopPropagation();
             deleteSlide(index);
@@ -415,20 +427,23 @@ function renderOptions(options = []) {
         const input = document.createElement('input');
         input.type = 'text';
         input.value = opt.text || '';
-        input.placeholder = `אפשרות ${idx + 1}`;
+        input.placeholder = `הכנס אפשרות ${idx + 1}...`;
         input.oninput = (e) => { opt.text = e.target.value; };
         
         const label = document.createElement('label');
         label.className = `correct-toggle ${opt.correct ? 'is-correct' : ''}`;
-        label.innerHTML = `<input type="checkbox" ${opt.correct ? 'checked' : ''}> נכון`;
-        label.querySelector('input').onchange = (e) => {
-            opt.correct = e.target.checked;
+        label.innerHTML = `<i class="fas ${opt.correct ? 'fa-check-circle' : 'fa-circle'}"></i> <span>תשובה נכונה</span>`;
+        label.onclick = (e) => {
+            opt.correct = !opt.correct;
             label.classList.toggle('is-correct', opt.correct);
+            label.querySelector('i').className = `fas ${opt.correct ? 'fa-check-circle' : 'fa-circle'}`;
         };
         
         const deleteBtn = document.createElement('button');
         deleteBtn.innerHTML = '<i class="fas fa-times"></i>';
-        deleteBtn.className = 'remove-option-btn';
+        deleteBtn.className = 'upload-btn';
+        deleteBtn.style.padding = '8px';
+        deleteBtn.style.background = 'transparent';
         deleteBtn.onclick = () => {
             const screen = currentCourseData.screens[selectedSlideIndex];
             if (screen.question && screen.question.options) {

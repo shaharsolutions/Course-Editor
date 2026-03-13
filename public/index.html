@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>עריכת לומדות - שחר פתרונות דיגיטליים</title>
+    <title>Course Studio | שחר פתרונות דיגיטליים</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700;800&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -14,32 +14,38 @@
         <!-- Sidebar: Course Selection & Slides List -->
         <aside id="sidebar">
             <header>
-                <h1>ניהול לומדות</h1>
-                <select id="course-selector">
-                    <option value="">בחר לומדה...</option>
-                </select>
+                <h1>COURSE STUDIO</h1>
+                <div class="form-group">
+                    <select id="course-selector">
+                        <option value="">בחר לומדה לעריכה...</option>
+                    </select>
+                </div>
             </header>
+
             <div id="sidebar-header-actions">
                 <label class="select-all-label">
-                    <input type="checkbox" id="select-all-slides"> בחר הכל
+                    <input type="checkbox" id="select-all-slides"> 
+                    <span>בחר את כל השקפים</span>
                 </label>
                 <div class="sidebar-buttons">
-                    <button id="upload-course-btn" class="secondary-btn small-btn" title="טען קורס מקובץ ZIP">
-                        <i class="fas fa-upload"></i> קורס חדש
+                    <button id="upload-course-btn" class="danger-btn small-btn" style="border-style: solid; background: rgba(56, 189, 248, 0.1); color: var(--primary); border-color: var(--primary);" title="טען קורס מקובץ ZIP">
+                        <i class="fas fa-plus"></i> לומדה חדשה
                     </button>
                     <button id="delete-course-btn" class="danger-btn small-btn" title="מחק לומדה נוכחית">
-                        <i class="fas fa-trash"></i> מחק
+                        <i class="fas fa-trash-alt"></i> למחוק
                     </button>
                     <input type="file" id="course-file-input" accept=".zip" class="hidden">
                 </div>
             </div>
             
-            <div id="bulk-actions" class="hidden glass">
-                <h4><i class="fas fa-layer-group"></i> עריכה קבוצתית</h4>
+            <div id="bulk-actions" class="hidden" style="padding: 16px 24px; border-bottom: 1px solid var(--border);">
+                <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--accent); margin-bottom: 12px;">
+                    <i class="fas fa-layer-group"></i> עריכה גלובלית
+                </h4>
                 <div class="form-group">
-                    <label>זמן השהייה (שניות)</label>
-                    <div class="bulk-input-group">
-                        <input type="number" id="bulk-min-delay" min="0" value="0">
+                    <label style="font-size: 0.75rem;">זמן השהייה (שניות)</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="number" id="bulk-min-delay" min="0" value="0" style="padding: 8px;">
                         <button id="apply-bulk-delay" class="primary-btn small-btn">החל</button>
                     </div>
                 </div>
@@ -50,24 +56,32 @@
                     <!-- Slides will be listed here -->
                 </ul>
             </div>
-            <button id="add-slide-btn" class="secondary-btn"><i class="fas fa-plus"></i> הוסף שקף</button>
+
+            <button id="add-slide-btn">
+                <i class="fas fa-magic"></i>
+                <span>הוסף שקף חדש</span>
+            </button>
         </aside>
 
         <!-- Main Workspace -->
         <main id="workspace">
             <div id="no-selection" class="empty-state">
-                <i class="fas fa-edit"></i>
-                <p>בחר שקף מהרשימה כדי להתחיל לערוך</p>
+                <i class="fas fa-columns"></i>
+                <p>בחר שקף כדי להתחיל לעצב</p>
+                <span style="color: var(--text-dim); font-size: 0.9rem; margin-top: 8px;">השינויים שלך יישמרו אוטומטית בעת הלחיצה על שמירה</span>
             </div>
 
             <div id="editor-form" class="hidden">
                 <header class="workspace-header">
-                    <h2 id="current-slide-id-display">עריכת שקף</h2>
+                    <div class="title-meta">
+                        <h2 id="current-slide-id-display" style="font-size: 1.25rem; color: var(--text-main); margin-bottom: 4px;">עריכת שקף</h2>
+                        <span style="font-size: 0.8rem; color: var(--text-dim);" id="course-name-breadcrumb">לומדה נוכחית</span>
+                    </div>
                     <div class="actions">
-                        <button id="preview-btn" class="secondary-btn-outline"><i class="fas fa-play"></i> תצוגה מקדימה של השקף</button>
-                        <button id="preview-course-btn" class="secondary-btn-outline"><i class="fas fa-external-link-alt"></i> תצוגה מקדימה של הלומדה</button>
-                        <button id="export-btn" class="secondary-btn-outline"><i class="fas fa-file-archive"></i> ייצוא ל-SCORM</button>
-                        <button id="save-btn" class="primary-btn">שמור שינויים</button>
+                        <button id="preview-btn" class="secondary-btn-outline"><i class="fas fa-eye"></i> תצוגה מקדימה</button>
+                        <button id="preview-course-btn" class="secondary-btn-outline"><i class="fas fa-play-circle"></i> הרצת לומדה</button>
+                        <button id="export-btn" class="secondary-btn-outline"><i class="fas fa-download"></i> ייצוא SCORM</button>
+                        <button id="save-btn" class="primary-btn"><i class="fas fa-save"></i> שמור</button>
                     </div>
                 </header>
 
@@ -76,80 +90,88 @@
                     <div class="field-column">
                         <div class="form-group">
                             <label>כותרת השקף</label>
-                            <input type="text" id="slide-title" placeholder="לדוגמה: מבוא ללומדה">
+                            <input type="text" id="slide-title" placeholder="הכנס כותרת מושכת...">
                         </div>
 
                         <div class="form-group">
-                            <label>תוכן השקף</label>
-                            <textarea id="slide-content" rows="6" placeholder="הכנס את תוכן השקף..."></textarea>
+                            <label>תוכן השקף (HTML נתמך)</label>
+                            <textarea id="slide-content" rows="10" placeholder="כתוב כאן את תוכן השקף שלך..."></textarea>
                         </div>
 
                         <div class="form-group">
                             <label>תמונת רקע (assets/...)</label>
-                            <input type="text" id="slide-bg" placeholder="לדוגמה: assets/scene_welcome.png">
+                            <div class="upload-wrapper">
+                                <input type="text" id="slide-bg" placeholder="למשל: assets/background_main.png" style="border:none; background:transparent;">
+                                <i class="fas fa-image" style="color: var(--primary); margin-right: 10px;"></i>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Right: Advanced Features -->
                     <div class="field-column">
                         <div class="feature-card glass">
-                            <h3><i class="fas fa-microphone"></i> קריינות וזמן</h3>
+                            <h3><i class="fas fa-volume-up"></i> סאונד ותזמון</h3>
                             
                             <div class="form-group">
-                                <label>קובץ קריינות (MP3/WAV)</label>
+                                <label>קובץ קריינות</label>
                                 <div class="upload-wrapper">
                                     <input type="file" id="audio-upload" accept="audio/*" class="hidden">
                                     <button type="button" class="upload-btn" onclick="document.getElementById('audio-upload').click()">
-                                        <i class="fas fa-cloud-upload-alt"></i> בחר קובץ
+                                        <i class="fas fa-music"></i> החלף קובץ
                                     </button>
-                                    <span id="audio-filename" class="filename-display">לא נבחר קובץ</span>
+                                    <span id="audio-filename" class="filename-display" style="margin-right: 15px;">לא נבחר קובץ</span>
                                 </div>
                                 <input type="hidden" id="audio-path">
                             </div>
 
-                            <div class="form-group inline-group">
+                            <div class="form-group inline-group" style="margin-top: 10px;">
                                 <label class="switch">
                                     <input type="checkbox" id="wait-for-audio">
                                     <span class="slider round"></span>
                                 </label>
-                                <span>חכה לסיום הקריינות לפני המשך</span>
+                                <span style="font-size: 0.9rem;">עצירה עד לסיום הקריינות</span>
                             </div>
 
                             <div class="form-group">
-                                <label>זמן השהייה מינימלי (שניות)</label>
-                                <input type="number" id="min-delay" min="0" value="0">
+                                <label>המתנה מינימלית (שניות)</label>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="number" id="min-delay" min="0" value="0" style="width: 80px;">
+                                    <span style="color: var(--text-dim); font-size: 0.85rem;">שניות</span>
+                                </div>
                             </div>
                         </div>
 
                         <div class="feature-card glass">
-                            <h3><i class="fas fa-question-circle"></i> הגדרות שאלה</h3>
-                            <div class="form-group inline-group">
+                            <h3><i class="fas fa-tasks"></i> אינטראקציה (שאלה)</h3>
+                            <div class="form-group inline-group" style="margin-bottom: 20px;">
                                 <label class="switch">
                                     <input type="checkbox" id="is-question" onchange="toggleQuestionFields()">
                                     <span class="slider round"></span>
                                 </label>
-                                <span>שקף שאלה</span>
+                                <span style="font-weight: 700;">הגדר כשקף שאלה</span>
                             </div>
 
                             <div id="question-fields" class="hidden">
                                 <div class="form-group">
                                     <label>טקסט השאלה</label>
-                                    <input type="text" id="question-text">
+                                    <input type="text" id="question-text" placeholder="מה השאלה שלך?">
                                 </div>
-                                <!-- Options structure can be expanded -->
-                                <div class="form-group">
-                                    <label>משוב לאחר תשובה</label>
-                                    <textarea id="question-feedback" rows="2" placeholder="הכנס את המשוב שיופיע לאחר המענה..."></textarea>
-                                </div>
-
+                                
                                 <div class="options-section">
-                                    <label>אפשרויות תשובה</label>
+                                    <label style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span>אפשרויות תשובה</span>
+                                        <button type="button" id="add-option-btn" class="upload-btn" style="padding: 4px 12px; font-size: 0.75rem;">
+                                            <i class="fas fa-plus"></i> הוסף
+                                        </button>
+                                    </label>
                                     <div id="options-container">
                                         <!-- Options will be dynamic -->
                                     </div>
-                                    <button type="button" id="add-option-btn" class="secondary-btn-outline small-btn">
-                                        <i class="fas fa-plus"></i> הוסף אפשרות
-                                    </button>
+                                </div>
+
+                                <div class="form-group" style="margin-top: 20px;">
+                                    <label>משוב לאחר מענה</label>
+                                    <textarea id="question-feedback" rows="3" placeholder="כל הכבוד! התשובה נכונה..."></textarea>
                                 </div>
                             </div>
                         </div>
@@ -162,7 +184,7 @@
     <!-- Preview Modal -->
     <div id="preview-modal" class="modal hidden">
         <div class="modal-content">
-            <span class="close-modal">&times;</span>
+            <span class="close-modal"><i class="fas fa-times"></i></span>
             <div id="preview-frame" class="preview-container">
                 <!-- Preview content will be injected here -->
             </div>
@@ -171,18 +193,22 @@
 
     <!-- Confirm Modal -->
     <div id="confirm-modal" class="modal hidden">
-        <div class="modal-content confirm-dialog">
-            <h3 id="confirm-title">אישור פעולה</h3>
-            <p id="confirm-message"></p>
-            <div class="confirm-actions">
+        <div class="modal-content" style="max-width: 400px; padding: 40px; text-align: center;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: var(--error); margin-bottom: 20px;"></i>
+            <h3 id="confirm-title" style="font-size: 1.5rem; margin-bottom: 12px;">האם אתה בטוח?</h3>
+            <p id="confirm-message" style="color: var(--text-muted); margin-bottom: 30px;"></p>
+            <div style="display: flex; gap: 12px; justify-content: center;">
                 <button id="confirm-cancel" class="secondary-btn-outline">ביטול</button>
-                <button id="confirm-ok" class="danger-btn">מחק לצמיתות</button>
+                <button id="confirm-ok" class="danger-btn" style="background: var(--error); color: white; border: none; padding: 10px 24px;">מחק לצמיתות</button>
             </div>
         </div>
     </div>
 
     <!-- Toast Notification -->
-    <div id="toast" class="hidden"></div>
+    <div id="toast" class="hidden">
+        <i class="fas fa-info-circle"></i>
+        <span id="toast-message"></span>
+    </div>
 
     <script src="app.js"></script>
 </body>
