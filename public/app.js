@@ -535,6 +535,8 @@ let previewAudio = null;
 // --- Preview Logic ---
 let previewSlideIdx = 0;
 let isFullPreview = false;
+let selectedMockupIndex = -1;
+let hasSubmittedAnswer = false;
 
 function showSlidePreview(index, isFull = false) {
     if (!currentCourseData.screens || currentCourseData.screens.length === 0) {
@@ -562,10 +564,18 @@ function showSlidePreview(index, isFull = false) {
     const audioUrl = audio ? (audio.startsWith('http') ? audio : storageUrl + audio) : '';
 
     const optionsHtml = (isQ && screen.question && screen.question.options) 
-        ? `<div class="mockup-options">
-            ${screen.question.options.map(opt => `<div class="mockup-option">${opt.text || 'אפשרות ריקה'}</div>`).join('')}
+        ? `<div class="mockup-options" id="mockup-options-list">
+            ${screen.question.options.map((opt, i) => `<div class="mockup-option" onclick="selectMockupOption(${i})">${opt.text || 'אפשרות ריקה'}</div>`).join('')}
           </div>` 
         : '';
+
+    if (index !== previewSlideIdx || !previewModal.classList.contains('hidden')) {
+        // Only reset if moving to a DIFFERENT slide
+        if (index !== previewSlideIdx) {
+            selectedMockupIndex = -1;
+            hasSubmittedAnswer = false;
+        }
+    }
 
     const courseTitle = courseSelector.options[courseSelector.selectedIndex].text.toLowerCase();
     const isHarassment = courseTitle.includes('הטרדה') || courseTitle.includes('מינית') || currentCourse.toLowerCase().includes('harass') || courseTitle.includes('harass');
@@ -606,15 +616,35 @@ function showSlidePreview(index, isFull = false) {
             
             <div class="mockup-nav-bar">
                 ${showPrev ? '<button class="mockup-btn mockup-btn-prev" onclick="prevPreviewSlide()">הקודם</button>' : ''}
-                ${isFull 
-                    ? (isLast 
-                        ? '<button class="mockup-btn" onclick="nextPreviewSlide()">סיום לומדה</button>'
-                        : '<button class="mockup-btn" onclick="nextPreviewSlide()">המשך</button>')
-                    : '<button class="mockup-btn" onclick="nextPreviewSlide()">סגור תצוגה</button>'
+                ${isQ && !hasSubmittedAnswer 
+                    ? '<button class="mockup-btn" onclick="checkMockupAnswer()">בדוק תשובה</button>'
+                    : (isFull 
+                        ? (isLast 
+                            ? '<button class="mockup-btn" onclick="nextPreviewSlide()">סיום לומדה</button>'
+                            : '<button class="mockup-btn" onclick="nextPreviewSlide()">המשך</button>')
+                        : '<button class="mockup-btn" onclick="nextPreviewSlide()">סגור תצוגה</button>')
                 }
             </div>
         </div>
     `;
+
+    // Re-apply states if already submitted
+    if (isQ && hasSubmittedAnswer) {
+        setTimeout(() => {
+            const options = document.querySelectorAll('.mockup-option');
+            options.forEach((optElem, i) => {
+                const optData = screen.question.options[i];
+                if (optData.correct) optElem.classList.add('correct');
+                else if (i === selectedMockupIndex) optElem.classList.add('incorrect');
+                optElem.style.cursor = 'default';
+            });
+        }, 10);
+    } else if (isQ && selectedMockupIndex !== -1) {
+        setTimeout(() => {
+            const options = document.querySelectorAll('.mockup-option');
+            if (options[selectedMockupIndex]) options[selectedMockupIndex].classList.add('selected');
+        }, 10);
+    }
 
     if (audioUrl && audioUrl !== storageUrl) {
         if (previewAudio) previewAudio.pause();
@@ -643,6 +673,50 @@ window.prevPreviewSlide = () => {
     if (previewSlideIdx > 0) {
         showSlidePreview(previewSlideIdx - 1, true);
     }
+};
+
+window.selectMockupOption = (index) => {
+    if (hasSubmittedAnswer) return;
+    
+    selectedMockupIndex = index;
+    const options = document.querySelectorAll('.mockup-option');
+    options.forEach((opt, i) => {
+        opt.classList.toggle('selected', i === index);
+    });
+};
+
+window.checkMockupAnswer = () => {
+    if (selectedMockupIndex === -1) {
+        showToast('בחר תשובה תחילה', 'info');
+        return;
+    }
+    
+    const screen = currentCourseData.screens[previewSlideIdx];
+    if (!screen || !screen.question || !screen.question.options) return;
+    
+    hasSubmittedAnswer = true;
+    const selectedOpt = screen.question.options[selectedMockupIndex];
+    const isCorrect = selectedOpt && selectedOpt.correct;
+    
+    const options = document.querySelectorAll('.mockup-option');
+    options.forEach((optElem, i) => {
+        const optData = screen.question.options[i];
+        if (optData.correct) {
+            optElem.classList.add('correct');
+        } else if (i === selectedMockupIndex) {
+            optElem.classList.add('incorrect');
+        }
+        optElem.style.cursor = 'default';
+    });
+    
+    if (isCorrect) {
+        showToast('כל הכבוד! תשובה נכונה', 'success');
+    } else {
+        showToast('אופס, תשובה לא נכונה. נסה שוב בשקף הבא', 'error');
+    }
+    
+    // Refresh the nav bar to show "Continue" instead of "Check"
+    showSlidePreview(previewSlideIdx, isFullPreview);
 };
 
 document.getElementById('preview-btn').onclick = () => {
