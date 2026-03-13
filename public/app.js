@@ -56,6 +56,13 @@ const confirmMessage = document.getElementById('confirm-message');
 const confirmOk = document.getElementById('confirm-ok');
 const confirmCancel = document.getElementById('confirm-cancel');
 
+// Upload Modal Elements
+const uploadModal = document.getElementById('upload-modal');
+const uploadLoadingState = document.getElementById('upload-loading-state');
+const uploadSuccessState = document.getElementById('upload-success-state');
+const uploadStatus = document.getElementById('upload-status');
+const openNewCourseBtn = document.getElementById('open-new-course-btn');
+
 // --- Initialization ---
 async function init() {
     console.log('[App] Initializing Course Editor...');
@@ -100,16 +107,22 @@ if (courseFileInput) {
 
         const baseName = file.name.replace('.zip', '').replace(/[^a-z0-9_\-\u0590-\u05FF]/gi, '_');
         const courseId = `${baseName}_${Date.now()}`;
-        const toastMsg = showPersistentToast('מעלה קובץ ZIP ישירות לענן...', 'info');
+        
+        // Setup UI
+        uploadStatus.textContent = 'מתחיל העלאה לענן...';
+        uploadLoadingState.classList.remove('hidden');
+        uploadSuccessState.classList.add('hidden');
+        uploadModal.classList.remove('hidden');
 
         try {
+            uploadStatus.textContent = 'מעלה קובץ ZIP ישירות לענן...';
             const { data, error } = await supabaseClient.storage
                 .from('course-assets')
                 .upload(`temp_zips/${courseId}.zip`, file);
 
             if (error) throw error;
 
-            console.log('[App] ZIP uploaded, requesting extraction...');
+            uploadStatus.textContent = 'העלאה הושלמה. מעבד את הקבצים ושומר בבסיס הנתונים...';
             const processResponse = await fetch(`${API_BASE}/courses/process-zip`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -118,20 +131,25 @@ if (courseFileInput) {
 
             const result = await processResponse.json();
             if (result.success) {
-                showToast('הקורס הועלה וטופל בהצלחה!');
-                await init();
-                if (courseSelector) {
-                    courseSelector.value = courseId;
+                // Show success state
+                const newCourseId = result.courseId;
+                uploadLoadingState.classList.add('hidden');
+                uploadSuccessState.classList.remove('hidden');
+                
+                openNewCourseBtn.onclick = async () => {
+                    uploadModal.classList.add('hidden');
+                    await init(); // Refresh course list
+                    courseSelector.value = newCourseId;
                     courseSelector.dispatchEvent(new Event('change'));
-                }
+                };
             } else {
-                showToast(result.error || 'שגיאה בעיבוד הקורס', 'error');
+                throw new Error(result.error || 'שגיאה בעיבוד הקורס');
             }
         } catch (err) {
             console.error('[App] Upload failed:', err);
             showToast(`שגיאת העלאה: ${err.message}`, 'error');
+            uploadModal.classList.add('hidden');
         } finally {
-            hidePersistentToast(toastMsg);
             courseFileInput.value = '';
         }
     };

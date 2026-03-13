@@ -649,6 +649,29 @@ input:checked + .slider:before {
     border: 1px solid var(--border);
 }
 
+/* Loader Animation */
+.loader-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100px;
+}
+
+.loader {
+    width: 60px;
+    height: 60px;
+    border: 6px solid rgba(56, 189, 248, 0.1);
+    border-top: 6px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
 .correct-toggle {
     display: flex;
     align-items: center;

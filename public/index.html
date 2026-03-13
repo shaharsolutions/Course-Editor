@@ -204,6 +204,26 @@
         </div>
     </div>
 
+    <!-- Upload Progress Modal -->
+    <div id="upload-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px; padding: 40px; text-align: center;">
+            <div id="upload-loading-state">
+                <div class="loader-container">
+                    <div class="loader"></div>
+                </div>
+                <h3 style="font-size: 1.5rem; margin-top: 24px; color: var(--primary);">מעלה לומדה...</h3>
+                <p id="upload-status" style="color: var(--text-muted); margin-top: 12px;">מכין קבצים לעיבוד בענן</p>
+            </div>
+            
+            <div id="upload-success-state" class="hidden">
+                <i class="fas fa-check-circle" style="font-size: 4rem; color: var(--success); margin-bottom: 24px;"></i>
+                <h3 style="font-size: 1.8rem; margin-bottom: 12px; color: white;">הלומדה מוכנה!</h3>
+                <p style="color: var(--text-muted); margin-bottom: 30px;">הלומדה החדשה שלך הועלתה וטופלה בהצלחה.</p>
+                <button id="open-new-course-btn" class="primary-btn" style="width: 100%;">כנס לעריכה</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast" class="hidden">
         <i class="fas fa-info-circle"></i>
