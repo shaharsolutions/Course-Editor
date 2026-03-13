@@ -3,54 +3,53 @@ const SCORM = {
     api: null,
     
     init() {
+        console.log("[SCORM] Searching for API...");
         this.api = this.findAPI(window);
+        
         if (!this.api && window.opener) {
             this.api = this.findAPI(window.opener);
         }
         
+        if (!this.api && window.parent && window.parent !== window) {
+            this.api = this.findAPI(window.parent);
+        }
+
         if (this.api) {
             console.log("[SCORM] API found, initializing...");
             try {
                 const res = this.api.LMSInitialize("");
-                if (res === "true") {
+                if (res === "true" || res === true) {
                     this.connected = true;
                     console.log("[SCORM] Initialized successfully");
                 } else {
-                    console.error("[SCORM] LMSInitialize failed");
+                    const errCode = this.api.LMSGetLastError();
+                    const errDesc = this.api.LMSGetErrorString(errCode);
+                    console.error(`[SCORM] LMSInitialize failed: ${errDesc} (${errCode})`);
                 }
             } catch (e) {
                 console.error("[SCORM] Exception during initialization", e);
             }
         } else {
-            console.warn("[SCORM] API not found. Running in standalone mode.");
+            console.warn("[SCORM] API NOT FOUND - LMS features will be disabled.");
         }
     },
 
     findAPI(win) {
-        let findAttempts = 0;
-        const findLimit = 10;
-        
-        // Search up the parent hierarchy
-        while (win.LMSInitialize === undefined && win.parent !== undefined && win.parent !== win) {
-            findAttempts++;
-            if (findAttempts > findLimit) break;
+        let attempts = 0;
+        while (win) {
+            if (win.LMSInitialize) return win;
+            if (win.API && win.API.LMSInitialize) return win.API;
+            
+            if (win === win.parent) break;
             win = win.parent;
+            attempts++;
+            if (attempts > 10) break;
         }
-        
-        if (win.LMSInitialize !== undefined) return win;
-
-        // Search down into frames (some LMSes do this)
-        if (win.frames && win.frames.length > 0) {
-            for (let i = 0; i < win.frames.length; i++) {
-                if (win.frames[i].LMSInitialize !== undefined) return win.frames[i];
-            }
-        }
-
         return null;
     },
 
     get(param) {
-        if (!this.connected) return null;
+        if (!this.connected || !this.api) return null;
         try {
             return this.api.LMSGetValue(param);
         } catch (e) {
@@ -60,11 +59,11 @@ const SCORM = {
     },
 
     set(param, value) {
-        if (!this.connected) return false;
+        if (!this.connected || !this.api) return false;
         try {
             const res = this.api.LMSSetValue(param, value);
             this.api.LMSCommit("");
-            return res === "true";
+            return res === "true" || res === true;
         } catch (e) {
             console.error(`[SCORM] Error setting ${param}`, e);
             return false;
@@ -82,7 +81,7 @@ const SCORM = {
     },
 
     finish() {
-        if (!this.connected) return;
+        if (!this.connected || !this.api) return;
         try {
             this.api.LMSFinish("");
         } catch (e) {
