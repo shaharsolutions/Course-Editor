@@ -502,13 +502,18 @@ function updateCurrentSlideData() {
 saveBtn.onclick = async () => {
     if (selectedSlideIndex === -1) return;
     
-    updateCurrentSlideData();
+    saveBtn.disabled = true;
+    const originalText = saveBtn.innerHTML;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> שומר...';
     
-    // Refresh list display
-    renderSlidesList(currentCourseData.screens);
-    
-    // Send to server
-    await saveCourse();
+    try {
+        updateCurrentSlideData();
+        renderSlidesList(currentCourseData.screens);
+        await saveCourse();
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
+    }
 };
 
 async function saveCourse() {
@@ -530,14 +535,25 @@ async function saveCourse() {
 }
 
 // --- Export ---
-document.getElementById('export-btn').onclick = () => {
+document.getElementById('export-btn').onclick = function() {
     if (!currentCourse) {
         showToast('בחר לומדה תחילה', 'info');
         return;
     }
     
+    const btn = this;
+    const originalContent = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> מכין הורדה...';
+    
     showToast('מכין חבילת SCORM להורדה...', 'info');
-    // Using window.open because the server returns a binary ZIP file
+    
+    // We use a link to trigger the download, but the timeout is to reset the button
+    setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+    }, 5000);
+
     window.location.href = `${API_BASE}/course/${currentCourse}/export`;
 };
 
@@ -574,7 +590,7 @@ function showSlidePreview(index, isFull = false) {
     const isQ = isEditingThisSlide ? isQuestion.checked : !!(screen.question && screen.question.text);
     const qText = isEditingThisSlide ? questionText.value : (screen.question ? screen.question.text : '');
 
-    const storageUrl = `https://czfjbmkjnodonmtjvwep.supabase.co/storage/v1/object/public/course-assets/${currentCourse}/`;
+    const storageUrl = `${SUPABASE_URL}/storage/v1/object/public/course-assets/${currentCourse}/`;
     const bgUrl = bg ? (bg.startsWith('http') ? bg : storageUrl + bg) : '';
     const audioUrl = audio ? (audio.startsWith('http') ? audio : storageUrl + audio) : '';
 
