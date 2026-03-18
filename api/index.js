@@ -10,10 +10,32 @@ const os = require('os');
 const crypto = require('crypto');
 const archiver = require('archiver');
 
+// Multer for local uploads (more reliable than direct client->storage for ZIPs)
+const upload = multer({ dest: os.tmpdir() });
+
 // Generate proper UUID v4
 function generateUUID() {
     return crypto.randomUUID();
 }
+
+const getMimeType = (filePath) => {
+    const ext = path.extname(filePath).toLowerCase();
+    const map = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.svg': 'image/svg+xml',
+        '.wav': 'audio/wav',
+        '.mp3': 'audio/mpeg',
+        '.json': 'application/json',
+        '.js': 'application/javascript',
+        '.html': 'text/html',
+        '.css': 'text/css'
+    };
+    return map[ext] || 'application/octet-stream';
+};
 
 const app = express();
 
@@ -49,18 +71,117 @@ app.get('/api/courses', async (req, res) => {
             .limit(50)
             .order('created_at', { ascending: false });
             
-        if (error) throw error;
+        if (error) {
+            console.error('[Backend] Supabase Error (Courses List):', error);
+            throw error;
+        }
         const mappedData = (data || []).map(item => ({
             id: item.id || item.course_id,
-            name: item.name || item.title || item.id
+            name: item.title || item.name || item.id
         }));
         res.json(mappedData);
     } catch (err) {
+        console.error('[Backend] Express Error (GET /api/courses):', err.message);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Process ZIP
+// Upload ZIP and process (New more reliable endpoint)
+app.post('/api/upload', upload.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    
+    const { baseName } = req.body;
+    const localZip = req.file.path;
+    const dbId = generateUUID();
+    const tempDir = path.join(os.tmpdir(), `extract_${dbId}`);
+
+    try {
+        await processLocalZip(localZip, tempDir, dbId, baseName);
+        res.json({ success: true, courseId: dbId });
+    } catch (err) {
+        console.error('[Backend] Upload/Process Error:', err.message);
+        res.status(500).json({ error: err.message });
+    } finally {
+        fs.remove(tempDir).catch(() => {});
+        fs.remove(localZip).catch(() => {});
+    }
+});
+
+async function processLocalZip(zipPath, tempDir, dbId, baseName) {
+    const zip = new AdmZip(zipPath);
+    await fs.ensureDir(tempDir);
+    zip.extractAllTo(tempDir, true);
+
+    let root = tempDir;
+    const sub = await fs.readdir(tempDir);
+    // Find content root (handle nested folder in ZIP)
+    if (sub.length === 1 && (await fs.stat(path.join(tempDir, sub[0]))).isDirectory()) {
+        root = path.join(tempDir, sub[0]);
+    }
+
+    const getFiles = async (dir) => {
+        const items = await fs.readdir(dir, { withFileTypes: true });
+        let allFiles = [];
+        for (const s of items) {
+            const p = path.join(dir, s.name);
+            if (s.isDirectory()) {
+                const children = await getFiles(p);
+                allFiles = allFiles.concat(children);
+            } else {
+                allFiles.push(p);
+            }
+        }
+        return allFiles;
+    };
+
+    const files = await getFiles(root);
+    console.log(`[Backend] Uploading ${files.length} assets for course ${dbId}...`);
+    
+    // Batch uploads to Supabase Storage
+    for (let i = 0; i < files.length; i += 5) {
+        const batch = files.slice(i, i + 5);
+        await Promise.all(batch.map(async (f) => {
+            const rel = path.relative(root, f);
+            if (rel.includes('.DS_Store') || rel.includes('__MACOSX')) return;
+            
+            try {
+                const content = await fs.readFile(f);
+                const contentType = getMimeType(f);
+                
+                // Supabase upload with explicit content type
+                const { error: upError } = await supabase.storage.from('course-assets').upload(`${dbId}/${rel}`, content, { 
+                    upsert: true,
+                    contentType: contentType
+                });
+                
+                if (upError) {
+                    console.error(`[Backend] Asset upload fail ${rel}:`, upError.message);
+                } else {
+                    console.log(`[Backend] Asset uploaded: ${rel} (${contentType})`);
+                }
+            } catch (err) {
+                console.error(`[Backend] Error processing file ${rel}:`, err.message);
+            }
+        }));
+    }
+
+    let courseData = { screens: [] };
+    const dataJsonPath = path.join(root, 'data.json');
+    if (await fs.pathExists(dataJsonPath)) courseData = await fs.readJson(dataJsonPath);
+
+    const HARDCODED_ORG_ID = "526d46ee-26ea-4b2f-9026-a579c64cccf2";
+    const { error: dbError } = await supabase.from('courses').insert({
+        id: dbId,
+        org_id: HARDCODED_ORG_ID,
+        title: baseName,
+        data: courseData,
+        published: true
+    });
+
+    if (dbError) throw dbError;
+}
+
+// Deprecated but maintained for compatibility: Process ZIP already in Storage
 app.post('/api/courses/process-zip', async (req, res) => {
     const { courseId, baseName, zipPath } = req.body;
     const tempDir = path.join(os.tmpdir(), `extract_${courseId}`);
@@ -71,51 +192,11 @@ app.post('/api/courses/process-zip', async (req, res) => {
         if (dlError) throw dlError;
         await fs.writeFile(localZip, Buffer.from(await blob.arrayBuffer()));
         
-        const zip = new AdmZip(localZip);
-        await fs.ensureDir(tempDir);
-        zip.extractAllTo(tempDir, true);
-
         const dbId = generateUUID();
-        let root = tempDir;
-        const sub = await fs.readdir(tempDir);
-        if (sub.length === 1 && (await fs.stat(path.join(tempDir, sub[0]))).isDirectory()) {
-            root = path.join(tempDir, sub[0]);
-        }
-
-        const getFiles = async (dir) => {
-            const items = await fs.readdir(dir, { withFileTypes: true });
-            const childFiles = await Promise.all(items.map(s => {
-                const p = path.resolve(dir, s.name);
-                return s.isDirectory() ? getFiles(p) : p;
-            }));
-            return Array.prototype.concat(...childFiles);
-        };
-
-        const files = await getFiles(root);
-        await Promise.all(files.map(async (f) => {
-            const rel = path.relative(root, f);
-            const content = await fs.readFile(f);
-            await supabase.storage.from('course-assets').upload(`${dbId}/${rel}`, content, { upsert: true });
-        }));
-
-        let courseData = { screens: [] };
-        const dataJsonPath = path.join(root, 'data.json');
-        if (await fs.pathExists(dataJsonPath)) courseData = await fs.readJson(dataJsonPath);
-
-        const HARDCODED_ORG_ID = "526d46ee-26ea-4b2f-9026-a579c64cccf2";
-        const { error: dbError } = await supabase.from('courses').insert({
-            id: dbId,
-            org_id: HARDCODED_ORG_ID,
-            name: baseName,
-            title: baseName,
-            data: courseData,
-            entry_point: 'index.html',
-            published: true
-        });
-
-        if (dbError) throw dbError;
+        await processLocalZip(localZip, tempDir, dbId, baseName);
         res.json({ success: true, courseId: dbId });
     } catch (err) {
+        console.error('[Backend] Express Error (POST /api/courses/process-zip):', err.message);
         res.status(500).json({ error: err.message });
     } finally {
         fs.remove(tempDir).catch(() => {});
@@ -150,61 +231,111 @@ app.delete('/api/course/:id', async (req, res) => {
 app.get('/api/course/:id/export', async (req, res) => {
     try {
         const courseId = req.params.id;
-        const { data: course } = await supabase.from('courses').select('name, data').eq('id', courseId).single();
+        const { data: course } = await supabase.from('courses').select('title, data').eq('id', courseId).single();
         const { data: storageFiles } = await supabase.storage.from('course-assets').list(courseId, { recursive: true, limit: 1000 });
 
         res.setHeader('Content-Type', 'application/zip');
-        res.setHeader('Content-Disposition', `attachment; filename="${course.name || 'course'}.zip"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${course.title || 'course'}.zip"`);
 
         const archive = archiver('zip', { zlib: { level: 9 } });
         archive.pipe(res);
         const exportedFiles = [];
+        const coreFiles = ['index.html', 'data.json', 'data.js', 'scorm_api.js', 'studio-player.js', 'studio-style.css', 'imsmanifest.xml'];
 
-        // 1. data.json
-        archive.append(JSON.stringify(course.data, null, 2), { name: 'data.json' });
-        exportedFiles.push('data.json');
+        // 1. Storage Files Gathering
+        const allPaths = [];
+        const gatherFiles = async (dir = '') => {
+            const path = courseId + (dir ? '/' + dir : '');
+            const { data, error } = await supabase.storage.from('course-assets').list(path, { limit: 1000 });
+            if (error) {
+                console.error(`[Backend] Export error listing ${path}:`, error.message);
+                return;
+            }
+            if (!data) return;
 
-        // 2. Template Files
+            for (const item of data) {
+                const rel = dir ? dir + '/' + item.name : item.name;
+                // In Supabase, directories have id: null (usually) or no metadata
+                if (item.id === null || (!item.metadata && !item.id)) {
+                    await gatherFiles(rel);
+                } else {
+                    allPaths.push(rel);
+                }
+            }
+        };
+
+        await gatherFiles();
+        
+        const exportLog = [];
+        exportLog.push(`[Export Log] Course ID: ${courseId}`);
+        exportLog.push(`[Export Log] Found ${allPaths.length} items in storage.`);
+
+        const downloadFile = async (filePath) => {
+            if (!filePath || filePath.endsWith('/') || filePath.split('/').pop() === '.emptyFolderPlaceholder') return;
+            // Skip core files
+            if (coreFiles.includes(filePath.split('/').pop())) return;
+
+            try {
+                const { data: fileData, error } = await supabase.storage.from('course-assets').download(`${courseId}/${filePath}`);
+                if (error) {
+                    exportLog.push(`[ERROR] Fail download ${filePath}: ${error.message}`);
+                    console.warn(`[Backend] Export fail ${filePath}:`, error.message);
+                    return;
+                }
+                if (fileData) {
+                    archive.append(Buffer.from(await fileData.arrayBuffer()), { name: filePath });
+                    exportedFiles.push(filePath);
+                }
+            } catch (err) {
+                exportLog.push(`[ERROR] Error ${filePath}: ${err.message}`);
+            }
+        };
+
+        // Download assets in batches
+        for (let i = 0; i < allPaths.length; i += 10) {
+            await Promise.all(allPaths.slice(i, i + 10).map(downloadFile));
+        }
+        
+        archive.append(exportLog.join('\n'), { name: 'export-log.txt' });
+
+        // 2. data.json & data.js (Generated from database)
+        let jsonStr = JSON.stringify(course.data, null, 2);
+        // Clean up paths: strip the course ID prefix (e.g. "GUID/logos/..." -> "logos/...")
+        const courseIdEscaped = courseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const guidRegex = new RegExp(`${courseIdEscaped}/`, 'g');
+        jsonStr = jsonStr.replace(guidRegex, '');
+        
+        archive.append(jsonStr, { name: 'data.json' });
+        archive.append(`window.courseData = ${jsonStr};`, { name: 'data.js' });
+        exportedFiles.push('data.json', 'data.js');
+
+        // 3. Template Files (Add these LAST so they overwrite any stray files from storage)
         const templateDir = path.join(__dirname, '../scorm-template');
         if (await fs.pathExists(templateDir)) {
             const files = await fs.readdir(templateDir);
             for (const file of files) {
-                if (file === 'imsmanifest.xml') continue; 
+                if (file === 'imsmanifest.xml' || file === 'data.js') continue; 
                 const fullPath = path.join(templateDir, file);
                 const stat = await fs.stat(fullPath);
                 if (stat.isFile()) {
                     archive.file(fullPath, { name: file });
                     exportedFiles.push(file);
-                } else if (file === 'assets') {
+                } else if (stat.isDirectory() && file === 'assets') {
+                    // Recursive add assets
+                    archive.directory(fullPath, 'assets');
                     const assetFiles = await fs.readdir(fullPath);
-                    for (const f of assetFiles) {
-                        archive.file(path.join(fullPath, f), { name: `assets/${f}` });
-                        exportedFiles.push(`assets/${f}`);
-                    }
+                    assetFiles.forEach(f => exportedFiles.push(`assets/${f}`));
                 }
             }
-        }
-
-        // 3. Storage Files
-        const downloadFile = async (file) => {
-            if (file.name === '.emptyFolderPlaceholder') return;
-            const { data: fileData } = await supabase.storage.from('course-assets').download(`${courseId}/${file.name}`);
-            if (fileData) {
-                archive.append(Buffer.from(await fileData.arrayBuffer()), { name: file.name });
-                exportedFiles.push(file.name);
-            }
-        };
-        for (let i = 0; i < storageFiles.length; i += 10) {
-            await Promise.all(storageFiles.slice(i, i + 10).map(downloadFile));
         }
 
         // 4. Manifest
         const manifest = `<?xml version="1.0" encoding="UTF-8"?>
 <manifest identifier="Course_${Date.now()}" version="1.0" xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2" xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd http://www.imsglobal.org/xsd/imsmd_rootv1p2 imsmd_rootv1p2.xsd http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd">
     <metadata><schema>ADL SCORM</schema><schemaversion>1.2</schemaversion></metadata>
-    <organizations default="ORG_1"><organization identifier="ORG_1"><title>${course.name}</title><item identifier="ITEM_1" identifierref="RES_1"><title>${course.name}</title></item></organization></organizations>
+    <organizations default="ORG_1"><organization identifier="ORG_1"><title>${course.title}</title><item identifier="ITEM_1" identifierref="RES_1"><title>${course.title}</title></item></organization></organizations>
     <resources><resource identifier="RES_1" type="webcontent" adlcp:scormtype="sco" href="index.html">
-        ${exportedFiles.map(f => `<file href="${f}"/>`).join('\n        ')}
+        ${[...new Set(exportedFiles)].map(f => `<file href="${f}"/>`).join('\n        ')}
     </resource></resources>
 </manifest>`;
         archive.append(manifest, { name: 'imsmanifest.xml' });

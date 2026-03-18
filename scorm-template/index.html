@@ -2,14 +2,28 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>שחר פתרונות דיגיטליים - לומדה אינטראקטיבית</title>
     <link rel="stylesheet" href="studio-style.css">
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <div id="player-container">
+    <div id="orientation-warning">
+        <div class="phone-icon">
+            <i class="fas fa-mobile-alt"></i>
+        </div>
+        <h2>אנא סובבו את המכשיר</h2>
+        <p>הלומדה מותאמת לצפייה במצב אופקי (Landscape) לחווית למידה מיטבית.</p>
+    </div>
+
+    <div id="loading-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#0f172a; display:flex; flex-direction:column; justify-content:center; align-items:center; z-index:9999; color:white;">
+        <div class="loader-pulse"></div>
+        <h2 style="margin-top:30px; font-family:Assistant, sans-serif; letter-spacing:1px;">טוען לומדה...</h2>
+        <p id="loading-status" style="margin-top:10px; color:#38bdf8; font-family:Assistant, sans-serif;">מכין את קבצי המדיה</p>
+    </div>
+
+    <div id="player-container" style="display:none;">
         <div class="overlay"></div>
         
         <div id="progress-container">
@@ -40,6 +54,7 @@
     </div>
 
     <script src="scorm_api.js"></script>
+    <script src="data.js"></script>
     <script src="studio-player.js"></script>
     <script>
         // Automatic Character Selection Logic

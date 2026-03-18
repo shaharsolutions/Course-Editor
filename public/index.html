@@ -105,10 +105,58 @@
                                 <i class="fas fa-image" style="color: var(--primary); margin-right: 10px;"></i>
                             </div>
                         </div>
+
+                        <div class="form-group" id="logo-field-group">
+                            <label>לוגו ארגון (מוצג בשקף הפתיחה)</label>
+                            <div class="upload-wrapper">
+                                <input type="file" id="logo-upload" accept="image/*" class="hidden">
+                                <button type="button" class="upload-btn" onclick="document.getElementById('logo-upload').click()">
+                                    <i class="fas fa-upload"></i> העלה לוגו
+                                </button>
+                                <span id="logo-filename" class="filename-display" style="margin-right: 15px;">לא נבחר לוגו</span>
+                            </div>
+                            <input type="hidden" id="logo-path">
+                            
+                            <div style="margin-top: 15px; display: flex; align-items: center; gap: 15px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.75rem;">צבע רקע לעיגול</label>
+                                    <input type="color" id="logo-bg-color" value="#38bdf8" style="width: 45px; height: 35px; border-radius: 6px; border: 1px solid var(--border); background: transparent; cursor: pointer;">
+                                </div>
+                                <span style="font-size: 0.85rem; color: var(--text-dim); margin-top: 15px;" id="logo-bg-color-hex">#38bdf8</span>
+                            </div>
+
+                            <div id="logo-preview-container" style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed var(--border);">
+                                <label style="display: block; font-size: 0.7rem; color: var(--text-dim); margin-bottom: 10px; text-align: center;">תצוגה מקדימה ללוגו</label>
+                                <div id="logo-preview-circle" style="width: 80px; height: 80px; margin: 0 auto; border-radius: 50%; border: 2px solid #38bdf8; background: rgba(56,189,248,0.1); display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 0 15px rgba(56,189,248,0.2); transition: all 0.3s ease;">
+                                    <img id="logo-preview-img" src="" style="max-width: 80%; max-height: 80%; object-fit: contain; display: none;">
+                                    <i id="logo-preview-placeholder" class="fas fa-shield-halved" style="font-size: 2rem; color: #38bdf8;"></i>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Right: Advanced Features -->
                     <div class="field-column">
+                        <div class="feature-card glass" id="officer-details-card">
+                            <h3><i class="fas fa-user-shield"></i> פרטי ממונה אבטחת מידע</h3>
+                            <div class="form-group">
+                                <label>שם הממונה</label>
+                                <input type="text" id="officer-name" placeholder="שם מלא...">
+                            </div>
+                            <div class="form-group">
+                                <label>תפקיד</label>
+                                <input type="text" id="officer-role" placeholder="למשל: מנהל אבטחת מידע...">
+                            </div>
+                            <div class="form-group">
+                                <label>טלפון ליצירת קשר</label>
+                                <input type="text" id="officer-phone" placeholder="050-0000000...">
+                            </div>
+                            <div class="form-group">
+                                <label>אימייל</label>
+                                <input type="email" id="officer-email" placeholder="email@organization.com...">
+                            </div>
+                        </div>
+
                         <div class="feature-card glass">
                             <h3><i class="fas fa-volume-up"></i> סאונד ותזמון</h3>
                             
@@ -186,6 +234,14 @@
         <div class="modal-content">
             <span class="close-modal"><i class="fas fa-times"></i></span>
             <div id="preview-frame" class="preview-container">
+                <!-- Orientation Warning for Mockup -->
+                <div id="mockup-orientation-warning">
+                    <div class="phone-icon-mockup">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <h3>אנא סובבו את המכשיר</h3>
+                    <p>הלומדה מותאמת למצב אופקי (Landscape)</p>
+                </div>
                 <!-- Preview content will be injected here -->
             </div>
         </div>

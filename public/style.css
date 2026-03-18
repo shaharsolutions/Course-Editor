@@ -436,7 +436,8 @@ input:focus, textarea:focus, select:focus {
 .stage-mockup {
     width: 100%;
     height: 100%;
-    background-size: cover;
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
     background-position: center;
     display: flex;
     align-items: center;
@@ -603,8 +604,10 @@ input:checked + .slider:before {
     border: 1px solid var(--border);
     border-radius: 24px;
     width: 95vw;
-    max-width: 1400px;
-    height: 90vh !important;
+    height: 95vh;
+    max-width: 1280px;
+    max-height: 720px;
+    aspect-ratio: 16 / 9;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -612,6 +615,49 @@ input:checked + .slider:before {
     box-shadow: var(--shadow-xl);
     transform: scale(0.9);
     transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Orientation Warning for Mockup */
+#mockup-orientation-warning {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-dark);
+    z-index: 5000;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 20px;
+    color: white;
+}
+
+@media (orientation: portrait) and (max-width: 1024px) {
+    #mockup-orientation-warning {
+        display: flex;
+    }
+}
+
+.phone-icon-mockup {
+    font-size: 3rem;
+    color: var(--primary);
+    margin-bottom: 20px;
+    animation: rotatePhone 2s infinite ease-in-out;
+}
+
+@keyframes rotatePhone {
+    0% { transform: rotate(0deg); }
+    50% { transform: rotate(90deg); }
+    100% { transform: rotate(0deg); }
+}
+
+#mockup-orientation-warning h3 {
+    font-size: 1.5rem;
+    color: var(--primary);
+    margin-bottom: 10px;
 }
 
 .modal:not(.hidden) .modal-content {
@@ -715,6 +761,7 @@ input:checked + .slider:before {
     height: 100%;
     position: relative;
     background-size: cover;
+    background-repeat: no-repeat;
     background-position: center;
     display: flex;
     align-items: center;
@@ -751,12 +798,14 @@ input:checked + .slider:before {
 }
 
 .mockup-character-section {
-    position: absolute; bottom: 60px; right: 10%; z-index: 5;
+    position: absolute; top: 50%; right: 5%; transform: translateY(-50%);
+    z-index: 5;
     display: flex; flex-direction: column; align-items: center; gap: 12px;
+    width: 40%;
 }
 
 .mockup-character-circle {
-    width: 200px; height: 200px; border-radius: 50%;
+    width: 32vh; height: 32vh; max-width: 250px; max-height: 250px; border-radius: 50%;
     border: 4px solid var(--primary); overflow: hidden;
     box-shadow: 0 0 40px var(--primary-glow);
 }
@@ -765,102 +814,69 @@ input:checked + .slider:before {
 
 .mockup-label {
     background: rgba(15, 23, 42, 0.9); color: var(--primary);
-    padding: 6px 16px; border-radius: 8px; font-size: 0.75rem;
+    padding: 8px 20px; border-radius: 12px; font-size: 0.85rem;
     border: 1px solid rgba(56, 189, 248, 0.2); font-weight: 700;
 }
 
 .content-area-mockup {
-    position: absolute; top: 50%; left: 8%; transform: translateY(-50%);
-    width: 42%; max-width: 500px; max-height: 80%;
+    position: absolute; top: 50%; left: 5%; transform: translateY(-50%);
+    width: 42%; max-width: 550px; max-height: 75%;
     background: rgba(15, 23, 42, 0.95); border: 1px solid var(--border);
-    border-radius: 24px; padding: 40px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    border-radius: 20px; padding: 35px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     z-index: 10; display: flex; flex-direction: column; text-align: right;
     direction: rtl; overflow-y: auto; backdrop-filter: blur(10px);
 }
 
-.content-area-mockup h1 { font-size: 2rem; color: var(--primary); margin-bottom: 20px; font-weight: 800; }
-.question-text { font-size: 1.1rem; color: var(--text-main); margin-bottom: 24px; }
+.content-area-mockup h1 { font-size: 1.8rem; color: var(--primary); margin-bottom: 20px; font-weight: 800; }
+.question-text { font-size: 1.05rem; color: var(--text-main); margin-bottom: 24px; }
+
+/* Splash Mode Mockup */
+.content-area-mockup.splash-mode {
+    left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important;
+    width: 75% !important; max-width: 800px !important; text-align: center !important;
+}
 
 .mockup-nav-bar {
-    position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-    z-index: 20; display: flex; gap: 12px;
+    position: absolute; bottom: 30px; left: 30px; right: 30px;
+    z-index: 20; display: flex; justify-content: space-between; gap: 12px;
+    pointer-events: none;
 }
 
 .mockup-btn {
-    padding: 12px 60px;
-    min-width: 160px;
+    pointer-events: auto;
+    padding: 12px 40px;
+    min-width: 150px;
     background: var(--primary);
     color: white;
     border-radius: 50px;
     font-weight: 800;
-    font-size: 1.1rem;
+    font-size: 1rem;
     border: none;
     cursor: pointer;
-    box-shadow: 0 4px 20px var(--primary-glow);
-    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    white-space: nowrap;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    box-shadow: 0 4px 15px var(--primary-glow);
 }
 
-.mockup-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px var(--primary-glow);
-    filter: brightness(1.1);
+.mockup-btn-prev { background: rgba(255, 255, 255, 0.05); color: var(--text-main); border: 1px solid var(--border); }
+
+/* RTL positioning: Next on Right, Prev on Left */
+.mockup-btn { order: 2; } /* Assuming default mockup-btn is 'Next' */
+.mockup-btn-prev { order: 1; }
+
+/* Responsive Mockup */
+@media (max-width: 1100px) {
+    .content-area-mockup { width: 48%; padding: 25px; }
+    .mockup-character-section { width: 38%; }
+    .mockup-character-circle { width: 25vh; height: 25vh; }
 }
 
-.mockup-btn-prev {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: none;
+@media (max-width: 900px) {
+    .content-area-mockup { width: 85%; left: 7.5%; top: 45%; max-height: 60%; }
+    .mockup-character-section { display: none !important; }
+    .mockup-nav-bar { bottom: 20px; left: 20px; right: 20px; }
 }
 
-/* Question Options */
-.mockup-options {
-    margin-top: 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+@media (max-width: 600px) {
+    .content-area-mockup { width: 92%; left: 4%; top: 40%; padding: 20px; }
+    .content-area-mockup h1 { font-size: 1.4rem; }
+    .mockup-btn { min-width: 110px; padding: 10px 15px; font-size: 0.85rem; }
 }
-
-.mockup-option {
-    padding: 12px 20px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 50px;
-    color: var(--text-main);
-    font-size: 1rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: right;
-}
-
-.mockup-option:hover {
-    background: rgba(56, 189, 248, 0.1);
-    border-color: var(--primary);
-    transform: translateX(-4px);
-}
-
-.mockup-option.selected {
-    background: rgba(56, 189, 248, 0.2);
-    border-color: var(--primary);
-    box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
-}
-
-.mockup-option.correct {
-    background: rgba(34, 197, 94, 0.15) !important;
-    border-color: var(--success) !important;
-    color: #4ade80 !important;
-}
-
-.mockup-option.incorrect {
-    background: rgba(239, 68, 68, 0.15) !important;
-    border-color: var(--error) !important;
-    color: #f87171 !important;
-}
-
-/* RTL Adjustment */
-[dir="rtl"] #sidebar { border-left: none; border-right: 1px solid var(--border); }
-[dir="rtl"] .delete-slide-btn { margin-right: auto; margin-left: 0; }
-[dir="rtl"] .secondary-btn-outline { margin-left: 0; margin-right: 10px; }
