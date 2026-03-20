@@ -73,14 +73,16 @@
         
         // --- Preview Mode Logic ---
         // If we have a courseId in session storage, we're in the editor's preview.
-        // We need to fetch from Supabase Storage.
+        // Files that are NOT system assets should be fetched from Supabase Storage.
         const previewCourseId = sessionStorage.getItem('previewCourseId');
-        if (previewCourseId) {
+        const systemAssets = ['maya_guide.png', 'mia_transparent_v4.png'];
+        
+        if (previewCourseId && !systemAssets.includes(clean)) {
             const SUPABASE_URL = 'https://iduyexkzivtnvrdsbwig.supabase.co';
             return `${SUPABASE_URL}/storage/v1/object/public/course-assets/${previewCourseId}/${clean.replace(/\/+/g, '/').replace(/^\//, '')}`;
         }
         
-        // Normal published mode
+        // Normal published mode OR system asset
         if (!clean.includes('/')) {
             clean = 'assets/' + clean;
         }
