@@ -862,6 +862,66 @@ input:checked + .slider:before {
 .mockup-btn { order: 2; } /* Assuming default mockup-btn is 'Next' */
 .mockup-btn-prev { order: 1; }
 
+/* Mockup Options Styling */
+.mockup-options {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mockup-option {
+    display: block;
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    color: white;
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: right;
+    transition: all 0.2s;
+    font-size: 0.95rem;
+}
+
+.mockup-option:hover {
+    background: rgba(56, 189, 248, 0.1);
+    border-color: var(--primary);
+}
+
+.mockup-option.selected {
+    background: rgba(56, 189, 248, 0.2);
+    border-color: var(--primary);
+    box-shadow: 0 0 15px var(--primary-glow);
+}
+
+.mockup-option.correct {
+    background: rgba(34, 197, 94, 0.2);
+    border-color: var(--success);
+    color: #4ade80;
+    font-weight: 700;
+}
+
+.mockup-option.incorrect {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: var(--error);
+    color: #f87171;
+}
+
+.feedback-status {
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 50px;
+    font-size: 1.25rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+}
+.feedback-status.correct { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 2px solid var(--success); }
+.feedback-status.incorrect { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 2px solid var(--error); }
+.feedback-status.info { background: rgba(56, 189, 248, 0.2); color: var(--primary); border: 2px solid var(--primary); }
+
+
+
 /* Responsive Mockup */
 @media (max-width: 1100px) {
     .content-area-mockup { width: 48%; padding: 25px; }
@@ -871,7 +931,9 @@ input:checked + .slider:before {
 
 @media (max-width: 900px) {
     .content-area-mockup { width: 85%; left: 7.5%; top: 45%; max-height: 60%; }
-    .mockup-character-section { display: none !important; }
+    .mockup-character-section { display: flex !important; transform: none; top: 10px; right: 10px; width: auto; z-index: 100; }
+    .mockup-character-circle { width: 60px; height: 60px; border-width: 2px; }
+    .mockup-label { display: none; }
     .mockup-nav-bar { bottom: 20px; left: 20px; right: 20px; }
 }
 

@@ -49,10 +49,17 @@ app.use(express.static(path.join(__dirname, '../public')));
 // Initialize Supabase
 const cleanEnv = (val) => {
     if (!val) return '';
-    return val.replace(/[\r\n\t]/g, '').trim().replace(/PORT=\d+.*$/i, '').trim();
+    // Strip trailing comments or PORT noise that sometimes appears in certain ENV setups
+    let cleaned = val.split('\n')[0].split('\r')[0];
+    cleaned = cleaned.replace(/PORT=\d+.*$/i, '').trim();
+    return cleaned.replace(/['"]/g, '').trim(); // Remove potential quotes
 };
 const supabaseUrl = cleanEnv(process.env.SUPABASE_URL);
 const supabaseKey = cleanEnv(process.env.SUPABASE_ANON_KEY);
+
+if (!supabaseUrl || !supabaseKey) {
+    console.error('[Backend] CRITICAL: Supabase credentials missing or invalid!');
+}
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // --- API Endpoints ---
@@ -81,8 +88,11 @@ app.get('/api/courses', async (req, res) => {
         }));
         res.json(mappedData);
     } catch (err) {
-        console.error('[Backend] Express Error (GET /api/courses):', err.message);
-        res.status(500).json({ error: err.message });
+        console.error('[Backend] Express Error (GET /api/courses):', err);
+        res.status(500).json({ 
+            error: err.message,
+            details: 'Make sure SUPABASE_URL and SUPABASE_ANON_KEY are set correctly.'
+        });
     }
 });
 
@@ -201,6 +211,12 @@ app.post('/api/courses/process-zip', async (req, res) => {
     } finally {
         fs.remove(tempDir).catch(() => {});
         fs.remove(localZip).catch(() => {});
+        // Cleanup the temp ZIP from Supabase Storage if it was uploaded there
+        if (zipPath && zipPath.startsWith('temp_uploads/')) {
+            supabase.storage.from('course-assets').remove([zipPath])
+                .then(() => console.log(`[Backend] Cleaned up temp ZIP: ${zipPath}`))
+                .catch(err => console.error(`[Backend] Fail to clean up temp ZIP ${zipPath}:`, err.message));
+        }
     }
 });
 

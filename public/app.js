@@ -1,4 +1,4 @@
-console.log('[App] Version: 2.1 - Fix ReferenceError');
+console.log('[App] Version: 2.2 - Fix 500/413 Upload Errors');
 
 // --- Configuration ---
 const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
@@ -135,23 +135,44 @@ if (courseFileInput) {
         uploadModal.classList.remove('hidden');
 
         try {
-            uploadStatus.textContent = 'מעלה קובץ ZIP לשרת לעיבוד (עקיפת שגיאות ענן)...';
+            uploadStatus.textContent = 'מעלה קובץ ZIP לענן (עקיפת הגבלת נפח)...';
             
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('baseName', baseName);
+            // Generate a unique path for the ZIP
+            const zipPath = `temp_uploads/${Date.now()}_${file.name}`;
+            
+            // Upload directly to Supabase Storage from frontend
+            const { data: uploadData, error: uploadError } = await supabaseClient
+                .storage
+                .from('course-assets')
+                .upload(zipPath, file, {
+                    cacheControl: '3600',
+                    upsert: false
+                });
 
-            const uploadResponse = await fetch(`${API_BASE}/upload`, {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!uploadResponse.ok) {
-                const errData = await uploadResponse.json().catch(() => ({}));
-                throw new Error(errData.error || `Server returned ${uploadResponse.status}`);
+            if (uploadError) {
+                console.error('[App] Supabase Direct Upload Error:', uploadError);
+                throw new Error(`שגיאת העלאה לענן: ${uploadError.message}`);
             }
 
-            const result = await uploadResponse.json();
+            uploadStatus.textContent = 'מעבד את הקובץ בשרת...';
+            
+            // Call the backend to process the ZIP already in storage
+            const processResponse = await fetch(`${API_BASE}/courses/process-zip`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    courseId: courseId, // This will be used as the new folder name
+                    baseName: baseName,
+                    zipPath: zipPath
+                })
+            });
+
+            if (!processResponse.ok) {
+                const errData = await processResponse.json().catch(() => ({}));
+                throw new Error(errData.error || `Server returned ${processResponse.status}`);
+            }
+
+            const result = await processResponse.json();
             if (result.success) {
                 // Show success state
                 const newCourseId = result.courseId;
@@ -947,10 +968,10 @@ window.checkMockupAnswer = () => {
     
     const questionText = screen.question.text || "";
     if (isCorrect) {
-        showMockupFeedback(questionText, 'תשובה נכונה<br><br>כל הכבוד! נכון מאוד.', () => nextPreviewSlide());
+        showMockupFeedback(questionText, `<span class="feedback-status correct">תשובה נכונה</span><br><br>כל הכבוד! נכון מאוד.`, () => nextPreviewSlide());
     } else {
         const feedback = screen.question.feedback || 'לא נורא, התשובה הנכונה מסומנת בירוק.';
-        showMockupFeedback(questionText, `תשובה לא נכונה<br><br>${feedback}`, () => nextPreviewSlide());
+        showMockupFeedback(questionText, `<span class="feedback-status incorrect">תשובה לא נכונה</span><br><br>${feedback}`, () => nextPreviewSlide());
     }
     
     // Refresh the nav bar to show "Continue" instead of "Check"
@@ -1134,7 +1155,7 @@ function showMockupFeedback(question, message, onContinue = null) {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             background: #0f172a; padding: 30px; border-radius: 20px; border: 1px solid #38bdf8;
             text-align: center; z-index: 1000; box-shadow: 0 0 50px rgba(0,0,0,0.5); color: white; width: 85%; max-width: 450px;
-            direction: rtl; font-family: inherit;
+            direction: rtl; font-family: inherit; max-height: 90%; overflow-y: auto;
         `;
         mockup.appendChild(modal);
         
@@ -1148,10 +1169,9 @@ function showMockupFeedback(question, message, onContinue = null) {
     modal.style.display = 'block';
     modal.innerHTML = `
         <div style="border-bottom: 2px solid #38bdf8; padding-bottom: 12px; margin-bottom: 15px; text-align: right;">
-            <h4 style="color:#38bdf8; margin-bottom:5px; font-size: 1rem;">השאלה:</h4>
+            <h4 style="color:#38bdf8; margin-bottom:5px; font-size: 1rem;">${question === "שימו לב" ? "" : "השאלה:"}</h4>
             <p style="font-size: 1.1rem; color: #f1f5f9;">${question}</p>
         </div>
-        <h3 style="color:#38bdf8; margin-bottom:12px; font-size: 1.3rem;">פידבק</h3>
         <p style="margin-bottom:25px; line-height: 1.4; color: #cbd5e1;">${message}</p>
         <button class="mockup-btn btn-primary" style="width:100%; padding: 12px; border-radius: 50px; background: #38bdf8; color: white; border: none; cursor: pointer; font-weight: bold; font-family: inherit;">המשך ללמידה</button>
     `;
