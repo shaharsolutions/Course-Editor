@@ -47,6 +47,7 @@ app.use(express.json({ limit: '50mb' }));
 
 // Static files
 app.use(express.static(path.join(__dirname, '../public')));
+app.use('/player', express.static(path.join(__dirname, '../scorm-template')));
 
 // --- Supabase Initialization ---
 // Hardcoded defaults ensure this works even if Vercel env vars are not set

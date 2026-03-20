@@ -524,6 +524,16 @@ input:checked + .slider:before {
     color: var(--primary);
 }
 
+.filename-display {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Empty State */
 .empty-state {
     display: flex;

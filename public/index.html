@@ -99,11 +99,15 @@
                         </div>
 
                         <div class="form-group">
-                            <label>תמונת רקע (assets/...)</label>
+                            <label>תמונת רקע (PNG/JPG)</label>
                             <div class="upload-wrapper">
-                                <input type="text" id="slide-bg" placeholder="למשל: assets/background_main.png" style="border:none; background:transparent;">
-                                <i class="fas fa-image" style="color: var(--primary); margin-right: 10px;"></i>
+                                <input type="file" id="bg-upload" accept="image/*" class="hidden">
+                                <button type="button" class="upload-btn" onclick="document.getElementById('bg-upload').click()">
+                                    <i class="fas fa-image"></i> בחר תמונה
+                                </button>
+                                <span id="bg-filename" class="filename-display" style="margin-right: 15px;">לא נבחרה תמונה</span>
                             </div>
+                            <input type="hidden" id="slide-bg">
                         </div>
 
                         <div class="form-group" id="logo-field-group">
@@ -233,7 +237,7 @@
     <div id="preview-modal" class="modal hidden">
         <div class="modal-content">
             <span class="close-modal"><i class="fas fa-times"></i></span>
-            <div id="preview-frame" class="preview-container">
+            <div class="preview-container">
                 <!-- Orientation Warning for Mockup -->
                 <div id="mockup-orientation-warning">
                     <div class="phone-icon-mockup">
@@ -242,7 +246,12 @@
                     <h3>אנא סובבו את המכשיר</h3>
                     <p>הלומדה מותאמת למצב אופקי (Landscape)</p>
                 </div>
-                <!-- Preview content will be injected here -->
+                
+                <!-- Mockup content injected here -->
+                <div id="preview-frame" style="width: 100%; height: 100%;"></div>
+
+                <!-- Full Player Iframe -->
+                <iframe id="preview-iframe-full" class="hidden" style="width: 100%; height: 100%; border: none; background: #0f172a; position: absolute; top: 0; left: 0; z-index: 20;"></iframe>
             </div>
         </div>
     </div>

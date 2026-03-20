@@ -60,7 +60,7 @@
      * Strips GUID prefixes and ensures relative paths are correctly mapped.
      */
     function resolveAssetPath(path) {
-        if (!path || path.startsWith('http') || path.startsWith('data:')) return path;
+        if (!path || path.startsWith('http') || path.startsWith('blob:') || path.startsWith('data:')) return path;
         
         let clean = path;
         // Strip leading GUID/ UUID prefix if present
@@ -71,7 +71,16 @@
             }
         }
         
-        // If it still doesn't have a directory part, fallback to assets/
+        // --- Preview Mode Logic ---
+        // If we have a courseId in session storage, we're in the editor's preview.
+        // We need to fetch from Supabase Storage.
+        const previewCourseId = sessionStorage.getItem('previewCourseId');
+        if (previewCourseId) {
+            const SUPABASE_URL = 'https://iduyexkzivtnvrdsbwig.supabase.co';
+            return `${SUPABASE_URL}/storage/v1/object/public/course-assets/${previewCourseId}/${clean.replace(/\/+/g, '/').replace(/^\//, '')}`;
+        }
+        
+        // Normal published mode
         if (!clean.includes('/')) {
             clean = 'assets/' + clean;
         }
@@ -104,6 +113,19 @@
 
         async function loadData() {
             try {
+                // Priority 0: Check if we have data injected via session storage from the editor (Live Preview)
+                const previewData = sessionStorage.getItem('previewCourseData');
+                if (previewData) {
+                    try {
+                        const parsed = JSON.parse(previewData);
+                        screens = parsed.screens || [];
+                        console.log(`[StudioPlayer] Success: Loaded ${screens.length} screens from session storage (Preview Mode)`);
+                        return true;
+                    } catch (e) {
+                        console.warn('[StudioPlayer] Failed to parse preview data from session storage:', e);
+                    }
+                }
+
                 // Priority 1: Check if data was loaded via script tag (data.js) - works offline/local
                 if (window.courseData) {
                     screens = window.courseData.screens || [];

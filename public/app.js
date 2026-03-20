@@ -36,6 +36,8 @@ const applyBulkDelayBtn = document.getElementById('apply-bulk-delay');
 const slideTitle = document.getElementById('slide-title');
 const slideContent = document.getElementById('slide-content');
 const slideBg = document.getElementById('slide-bg');
+const bgUpload = document.getElementById('bg-upload');
+const bgFilename = document.getElementById('bg-filename');
 const audioUpload = document.getElementById('audio-upload');
 const audioFilename = document.getElementById('audio-filename');
 const audioPath = document.getElementById('audio-path');
@@ -468,6 +470,7 @@ function selectSlide(index) {
     slideTitle.value = screen.title || '';
     slideContent.value = screen.content || '';
     slideBg.value = screen.bgImage || '';
+    bgFilename.textContent = screen.bgImage ? screen.bgImage.split('/').pop() : 'לא נבחרה תמונה';
     
     // Audio/Delay
     audioPath.value = screen.audio || '';
@@ -832,6 +835,13 @@ window.showSlidePreview = async (index, isFull = false) => {
         </div>
     `;
 
+    // Ensure we show the mockup frame and hide the full iframe when doing slide preview
+    const fullIframe = document.getElementById('preview-iframe-full');
+    const mockupDiv = document.getElementById('preview-frame');
+    if (fullIframe) fullIframe.classList.add('hidden');
+    if (mockupDiv) mockupDiv.classList.remove('hidden');
+
+    previewModal.classList.remove('hidden');
     // Re-apply states if already submitted
     if (isQ && hasSubmittedAnswer) {
         setTimeout(() => {
@@ -1004,23 +1014,48 @@ previewCourseBtn.onclick = async () => {
         return;
     }
     
-    const toLoad = [];
-    currentCourseData.screens.forEach(s => {
-        if (s.bgImage) toLoad.push(getAssetUrl(s.bgImage));
-        if (s.audio) toLoad.push(getAssetUrl(s.audio));
-        if (s.logo) toLoad.push(getAssetUrl(s.logo));
-    });
+    // Ensure latest data from the editor is available
+    updateCurrentSlideData();
+
+    // Set up session storage for the player to read
+    sessionStorage.setItem('previewCourseData', JSON.stringify(currentCourseData));
+    sessionStorage.setItem('previewCourseId', currentCourse);
+
+    const fullIframe = document.getElementById('preview-iframe-full');
+    const mockupDiv = document.getElementById('preview-frame');
     
-    await preloadMockupMedia(toLoad.filter(u => u));
-    showSlidePreview(0, true);
+    // Show Iframe, hide Mockup elements
+    if (fullIframe) {
+        fullIframe.src = `player/index.html?preview=true&t=${Date.now()}`;
+        fullIframe.classList.remove('hidden');
+    }
+    if (mockupDiv) mockupDiv.classList.add('hidden');
+
+    previewModal.classList.remove('hidden');
 };
 
 const closePreview = () => {
     previewModal.classList.add('hidden');
+    
+    const fullIframe = document.getElementById('preview-iframe-full');
+    const mockupDiv = document.getElementById('preview-frame');
+    
+    if (fullIframe) {
+        fullIframe.classList.add('hidden');
+        fullIframe.src = 'about:blank';
+    }
+    if (mockupDiv) {
+        mockupDiv.classList.remove('hidden');
+    }
+
     if (previewAudio) {
         previewAudio.pause();
         previewAudio = null;
     }
+    
+    // Cleanup preview storage
+    sessionStorage.removeItem('previewCourseData');
+    sessionStorage.removeItem('previewCourseId');
 };
 
 closeModal.onclick = closePreview;
@@ -1107,6 +1142,39 @@ logoUpload.onchange = async (e) => {
     } catch (err) {
         console.error('[App] Logo upload failed:', err);
         showToast('שגיאה בהעלאת הלוגו', 'error');
+    }
+};
+
+// --- Background Upload ---
+bgUpload.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!currentCourse) {
+        showToast('בחר לומדה תחילה', 'info');
+        return;
+    }
+    
+    showToast('מעלה תמונת רקע...', 'info');
+    
+    try {
+        const filePath = `${currentCourse}/assets/${Date.now()}_${file.name}`;
+        const { data, error } = await supabaseClient.storage
+            .from('course-assets')
+            .upload(filePath, file);
+        
+        if (error) throw error;
+        
+        slideBg.value = filePath;
+        bgFilename.textContent = file.name;
+        showToast('תמונת הרקע הועלתה בהצלחה!');
+        
+        // Auto-save the change to the current screen object
+        if (selectedSlideIndex !== -1) {
+            currentCourseData.screens[selectedSlideIndex].bgImage = filePath;
+        }
+    } catch (err) {
+        console.error('[App] Background upload failed:', err);
+        showToast('שגיאה בהעלאת התמונה', 'error');
     }
 };
 
