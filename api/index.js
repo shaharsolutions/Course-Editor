@@ -1,4 +1,6 @@
-require('dotenv').config();
+// Safe dotenv loading (v17 may throw or behave unexpectedly on Vercel where .env doesn't exist)
+try { require('dotenv').config(); } catch (e) { /* no .env on Vercel, that's fine */ }
+
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -46,37 +48,63 @@ app.use(express.json({ limit: '50mb' }));
 // Static files
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Initialize Supabase
-// Initialize Supabase with better cleanup and hardcoded fallbacks for this specific project
-const cleanEnv = (val) => {
-    if (val === undefined || val === null) return '';
-    // Handle Vercel's potential oddities and manual ENV pastes
-    return val.toString().split(/\r|\n/)[0].split('#')[0].trim().replace(/^['"]|['"]$/g, '');
-};
+// --- Supabase Initialization ---
+// Hardcoded defaults ensure this works even if Vercel env vars are not set
+const FALLBACK_URL = 'https://iduyexkzivtnvrdsbwig.supabase.co';
+const FALLBACK_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkdXlleGt6aXZ0bnZyZHNid2lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0NjYwMTYsImV4cCI6MjA4OTA0MjAxNn0.MhqZwvY7RiOBBqgBhRD-e-SqbI7NIf2vWxNuD5_6e48';
 
-const DEFAULT_URL = 'https://iduyexkzivtnvrdsbwig.supabase.co';
-const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkdXlleGt6aXZ0bnZyZHNid2lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0NjYwMTYsImV4cCI6MjA4OTA0MjAxNn0.MhqZwvY7RiOBBqgBhRD-e-SqbI7NIf2vWxNuD5_6e48';
-
-const supabaseUrl = cleanEnv(process.env.SUPABASE_URL) || DEFAULT_URL;
-const supabaseKey = cleanEnv(process.env.SUPABASE_ANON_KEY) || DEFAULT_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-    console.error('[Backend] CRITICAL: Supabase credentials missing!');
+function getCleanEnv(name, fallback) {
+    const raw = process.env[name];
+    if (raw === undefined || raw === null || raw === '') return fallback;
+    // Clean up potential whitespace, quotes, trailing comments
+    const cleaned = raw.toString().split(/[\r\n]/)[0].trim().replace(/^['"]|['"]$/g, '');
+    return cleaned || fallback;
 }
+
+const supabaseUrl = getCleanEnv('SUPABASE_URL', FALLBACK_URL);
+const supabaseKey = getCleanEnv('SUPABASE_ANON_KEY', FALLBACK_KEY);
+
+console.log('[Backend] Supabase URL resolved to:', supabaseUrl);
+console.log('[Backend] Supabase Key resolved (first 20 chars):', supabaseKey.substring(0, 20) + '...');
 
 let supabase;
 try {
     supabase = createClient(supabaseUrl, supabaseKey);
-    console.log('[Backend] Using Supabase URL:', supabaseUrl);
+    console.log('[Backend] Supabase client created OK');
 } catch (err) {
-    console.error('[Backend] Failed to initialize Supabase client:', err.message);
+    console.error('[Backend] FATAL: Failed to create Supabase client:', err);
 }
 
 // --- API Endpoints ---
 
-// Health check
+// Diagnostic health check - tests actual DB connection
 app.get('/api/health', async (req, res) => {
-    res.json({ ok: true, supabaseUrl: !!supabaseUrl });
+    const diag = {
+        ok: false,
+        supabaseUrl: supabaseUrl,
+        supabaseKeyPrefix: supabaseKey ? supabaseKey.substring(0, 20) + '...' : 'MISSING',
+        clientCreated: !!supabase,
+        envSource: process.env.SUPABASE_URL ? 'env' : 'fallback',
+        nodeVersion: process.version,
+        platform: process.platform,
+        dbTest: null
+    };
+
+    if (supabase) {
+        try {
+            const { data, error } = await supabase.from('courses').select('id').limit(1);
+            if (error) {
+                diag.dbTest = { success: false, error: error.message, code: error.code };
+            } else {
+                diag.dbTest = { success: true, rowCount: data ? data.length : 0 };
+                diag.ok = true;
+            }
+        } catch (err) {
+            diag.dbTest = { success: false, error: err.message, type: err.constructor.name };
+        }
+    }
+
+    res.json(diag);
 });
 
 // List courses
