@@ -47,24 +47,27 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Initialize Supabase
-// Initialize Supabase with better cleanup
+// Initialize Supabase with better cleanup and hardcoded fallbacks for this specific project
 const cleanEnv = (val) => {
-    if (!val) return '';
+    if (val === undefined || val === null) return '';
     // Handle Vercel's potential oddities and manual ENV pastes
     return val.toString().split(/\r|\n/)[0].split('#')[0].trim().replace(/^['"]|['"]$/g, '');
 };
 
-const supabaseUrl = cleanEnv(process.env.SUPABASE_URL);
-const supabaseKey = cleanEnv(process.env.SUPABASE_ANON_KEY);
+const DEFAULT_URL = 'https://iduyexkzivtnvrdsbwig.supabase.co';
+const DEFAULT_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkdXlleGt6aXZ0bnZyZHNid2lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0NjYwMTYsImV4cCI6MjA4OTA0MjAxNn0.MhqZwvY7RiOBBqgBhRD-e-SqbI7NIf2vWxNuD5_6e48';
+
+const supabaseUrl = cleanEnv(process.env.SUPABASE_URL) || DEFAULT_URL;
+const supabaseKey = cleanEnv(process.env.SUPABASE_ANON_KEY) || DEFAULT_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-    console.error('[Backend] CRITICAL: Supabase credentials missing or invalid!');
+    console.error('[Backend] CRITICAL: Supabase credentials missing!');
 }
 
 let supabase;
 try {
     supabase = createClient(supabaseUrl, supabaseKey);
-    console.log('[Backend] Supabase client created for:', supabaseUrl);
+    console.log('[Backend] Using Supabase URL:', supabaseUrl);
 } catch (err) {
     console.error('[Backend] Failed to initialize Supabase client:', err.message);
 }

@@ -88,7 +88,10 @@ async function init() {
     console.log('[App] Initializing Course Editor...');
     try {
         const response = await fetch(`${API_BASE}/courses`);
-        if (!response.ok) throw new Error('Failed to fetch courses');
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `Server returned ${response.status}`);
+        }
         const courses = await response.json();
         
         if (courseSelector) {
