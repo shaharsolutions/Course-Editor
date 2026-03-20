@@ -47,20 +47,27 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Initialize Supabase
+// Initialize Supabase with better cleanup
 const cleanEnv = (val) => {
     if (!val) return '';
-    // Strip trailing comments or PORT noise that sometimes appears in certain ENV setups
-    let cleaned = val.split('\n')[0].split('\r')[0];
-    cleaned = cleaned.replace(/PORT=\d+.*$/i, '').trim();
-    return cleaned.replace(/['"]/g, '').trim(); // Remove potential quotes
+    // Handle Vercel's potential oddities and manual ENV pastes
+    return val.toString().split(/\r|\n/)[0].split('#')[0].trim().replace(/^['"]|['"]$/g, '');
 };
+
 const supabaseUrl = cleanEnv(process.env.SUPABASE_URL);
 const supabaseKey = cleanEnv(process.env.SUPABASE_ANON_KEY);
 
 if (!supabaseUrl || !supabaseKey) {
     console.error('[Backend] CRITICAL: Supabase credentials missing or invalid!');
 }
-const supabase = createClient(supabaseUrl, supabaseKey);
+
+let supabase;
+try {
+    supabase = createClient(supabaseUrl, supabaseKey);
+    console.log('[Backend] Supabase client created for:', supabaseUrl);
+} catch (err) {
+    console.error('[Backend] Failed to initialize Supabase client:', err.message);
+}
 
 // --- API Endpoints ---
 
@@ -74,14 +81,15 @@ app.get('/api/courses', async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('courses')
-            .select('*')
+            .select('id, title, created_at')
             .limit(50)
             .order('created_at', { ascending: false });
             
         if (error) {
             console.error('[Backend] Supabase Error (Courses List):', error);
-            throw error;
+            return res.status(500).json({ error: error.message, details: error });
         }
+        
         const mappedData = (data || []).map(item => ({
             id: item.id || item.course_id,
             name: item.title || item.name || item.id
@@ -91,7 +99,8 @@ app.get('/api/courses', async (req, res) => {
         console.error('[Backend] Express Error (GET /api/courses):', err);
         res.status(500).json({ 
             error: err.message,
-            details: 'Make sure SUPABASE_URL and SUPABASE_ANON_KEY are set correctly.'
+            stack: err.stack,
+            details: 'Initialization or runtime failure.'
         });
     }
 });
@@ -198,16 +207,21 @@ app.post('/api/courses/process-zip', async (req, res) => {
     const localZip = path.join(os.tmpdir(), `${courseId}.zip`);
 
     try {
+        if (!supabase) throw new Error('Supabase client not initialized');
+        
+        console.log(`[Backend] Processing ZIP from storage: ${zipPath}`);
         const { data: blob, error: dlError } = await supabase.storage.from('course-assets').download(zipPath);
         if (dlError) throw dlError;
-        await fs.writeFile(localZip, Buffer.from(await blob.arrayBuffer()));
+        
+        const arrayBuffer = await blob.arrayBuffer();
+        await fs.writeFile(localZip, Buffer.from(arrayBuffer));
         
         const dbId = generateUUID();
         await processLocalZip(localZip, tempDir, dbId, baseName);
         res.json({ success: true, courseId: dbId });
     } catch (err) {
-        console.error('[Backend] Express Error (POST /api/courses/process-zip):', err.message);
-        res.status(500).json({ error: err.message });
+        console.error('[Backend] Express Error (POST /api/courses/process-zip):', err);
+        res.status(500).json({ error: err.message, details: err });
     } finally {
         fs.remove(tempDir).catch(() => {});
         fs.remove(localZip).catch(() => {});
@@ -222,15 +236,30 @@ app.post('/api/courses/process-zip', async (req, res) => {
 
 // Course Data
 app.get('/api/course/:id', async (req, res) => {
-    const { data, error } = await supabase.from('courses').select('data').eq('id', req.params.id).single();
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data.data);
+    try {
+        const { data, error } = await supabase.from('courses').select('data').eq('id', req.params.id).single();
+        if (error) {
+            console.error(`[Backend] Course fetch error (${req.params.id}):`, error.message);
+            return res.status(500).json({ error: error.message });
+        }
+        if (!data) return res.status(404).json({ error: 'Course not found' });
+        res.json(data.data || { screens: [] });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.post('/api/course/:id', async (req, res) => {
-    const { error } = await supabase.from('courses').update({ data: req.body }).eq('id', req.params.id);
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true });
+    try {
+        const { error } = await supabase.from('courses').update({ data: req.body }).eq('id', req.params.id);
+        if (error) {
+            console.error(`[Backend] Course update error (${req.params.id}):`, error.message);
+            return res.status(500).json({ error: error.message });
+        }
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Delete Course
