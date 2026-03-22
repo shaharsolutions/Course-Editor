@@ -20,6 +20,25 @@
         }
     }
 
+    let typeTimer = null;
+    function typeEffect(element, text, speed = 20) {
+        if (typeTimer) clearInterval(typeTimer);
+        element.innerHTML = '';
+        let i = 0;
+        // Strip HTML for the typing effect but keep structure if needed
+        // For now, we'll just treat it as text and allow simple <br> if we handle it
+        typeTimer = setInterval(() => {
+            if (i < text.length) {
+                element.innerHTML += text.charAt(i);
+                i++;
+                element.scrollTop = element.scrollHeight;
+            } else {
+                clearInterval(typeTimer);
+                typeTimer = null;
+            }
+        }, speed);
+    }
+
     function fitPlayer() {
         const container = document.getElementById('player-container');
         if (!container) return;
@@ -75,7 +94,7 @@
         // If we have a courseId in session storage, we're in the editor's preview.
         // Files that are NOT system assets should be fetched from Supabase Storage.
         const previewCourseId = sessionStorage.getItem('previewCourseId');
-        const systemAssets = ['maya_guide.png', 'mia_transparent_v4.png'];
+        const systemAssets = ['maya_guide.png', 'mia_transparent_v4.png', 'bg_welcome.png', 'bg_content.png', 'bg_quiz.png', 'bg_summary.png'];
         
         if (previewCourseId && !systemAssets.includes(clean)) {
             const SUPABASE_URL = 'https://iduyexkzivtnvrdsbwig.supabase.co';
@@ -99,9 +118,9 @@
 
         // Initial Loading View
         contentArea.innerHTML = `
-            <div style="text-align:center; padding:50px;">
-                <i class="fas fa-spinner fa-spin" style="font-size:3rem; color:#38bdf8;"></i>
-                <p style="margin-top:20px; color:#94a3b8;">טוען נתונים...</p>
+            <div style="text-align:center; padding:50px;" class="animate-in">
+                <div class="loader-pulse" style="margin: 0 auto;"></div>
+                <p style="margin-top:20px; color:#94a3b8;" class="cyber-glitch">מכין את מרחב הלמידה...</p>
             </div>`;
 
         // SCORM Init
@@ -111,6 +130,98 @@
             }
         } catch (e) {
             console.warn('[StudioPlayer] SCORM error:', e);
+        }
+
+        // Global helper for flip cards
+        window.toggleCard = (el) => {
+            el.classList.toggle('flipped');
+            if (el.classList.contains('flipped')) {
+                el.classList.add('was-flipped');
+                // Signal that an activity occurred (like flipping a card)
+                if (window.onSlideActivity) window.onSlideActivity();
+            }
+        };
+
+        // Global helpers
+window.foundFlags = new Set();
+window.totalFlags = 0;
+
+window.handleFlagClick = (el, id) => {
+    if (window.foundFlags.has(id)) return;
+    window.foundFlags.add(id);
+    el.classList.add('found');
+    
+    const msgs = {
+        'sender': '<strong>זיהוי מעולה של כתובת מזויפת!</strong><br>שימו לב לכתובת המייל (paypa1 במקום paypal). נוכלים מרבים להשתמש באותיות דומות או החלפת L ב-1 כדי להטעות את העין במבט ראשון.',
+        'greeting': '<strong>פנייה כללית מחשידה!</strong><br>אימייל לגיטימי ורשמי ממוסד המכיר אתכם תמיד יפנה אליכם בשמכם הפרטי או המלא, ולא בכינוי גנרי כמו "לקוח יקר".',
+        'link': '<strong>זהירות מלינקים במסווה!</strong><br>הכפתור מעוצב כמו מערכת רשמית אך תמיד יש לרחף עם העכבר כדי לראות את כתובת ה-URL השלמה ולוודא שהיא לא הונאה.'
+    };
+    
+    const feedbackArea = document.getElementById('phishing-feedback-area');
+    if (feedbackArea) {
+        feedbackArea.classList.remove('animate-in');
+        void feedbackArea.offsetWidth; // trigger reflow
+        feedbackArea.classList.add('animate-in');
+        
+        feedbackArea.innerHTML = `
+            <div style="background: rgba(254,242,242,0.9); border-right: 4px solid #ef4444; padding: 10px 15px; border-radius: 8px; color: #1e293b; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 5px;">
+                <i class="fas fa-exclamation-triangle" style="color: #ef4444; float: right; margin-left: 12px; font-size: 1.2rem; margin-top: 2px;"></i>
+                <div style="margin-right: 30px; line-height: 1.4; font-size: 0.9rem;">${msgs[id] || 'זיהית סימן מחשיד'}</div>
+            </div>
+        `;
+    }
+    
+    updatePhishingCounter(msgs[id]);
+};
+
+window.updatePhishingCounter = (lastFeedbackHtml) => {
+    const counter = document.getElementById('phishing-counter-text');
+    if (counter) {
+        counter.innerHTML = `<span style="font-size: 1.5rem; color: #ef4444; margin-left: 5px;">${window.foundFlags.size}</span> מתוך ${window.totalFlags}`;
+    }
+    
+    // Unlock if all found
+    const reportBtn = document.getElementById('report-simulation-btn');
+    if (window.foundFlags.size >= window.totalFlags) {
+        if (reportBtn) {
+            reportBtn.classList.remove('locked');
+            reportBtn.style.opacity = '1';
+            reportBtn.style.pointerEvents = 'auto';
+            reportBtn.style.animation = 'pulseRed 1.5s infinite';
+            const icon = reportBtn.querySelector('i');
+            if(icon) icon.className = 'fas fa-shield-check';
+            reportBtn.innerHTML = '<i class="fas fa-shield-alt" style="margin-left: 6px;"></i> דווח למערכת';
+        }
+        
+        const feedbackArea = document.getElementById('phishing-feedback-area');
+        if (feedbackArea && lastFeedbackHtml) {
+            // Displays both the specific feedback AND the success message
+            feedbackArea.innerHTML = `
+                <div class="animate-in" style="background: rgba(254,242,242,0.9); border-right: 4px solid #ef4444; padding: 8px 12px; border-radius: 8px; color: #1e293b; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 8px;">
+                    <i class="fas fa-exclamation-triangle" style="color: #ef4444; float: right; margin-left: 12px; font-size: 1.1rem; margin-top: 2px;"></i>
+                    <div style="margin-right: 30px; line-height: 1.4; font-size: 0.85rem;">${lastFeedbackHtml}</div>
+                </div>
+                <div class="animate-in delay-1" style="background: rgba(34,197,94,0.15); border-right: 4px solid #22c55e; padding: 8px 12px; border-radius: 8px; color: #166534; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px dashed #22c55e;">
+                    <i class="fas fa-check-circle" style="color: #22c55e; float: right; margin-left: 12px; font-size: 1.1rem; margin-top: 2px;"></i>
+                    <div style="margin-right: 30px; line-height: 1.4; font-size: 0.9rem;"><strong>כל הכבוד!</strong> מצאת את הכל. כעת <strong>דווח למערכת</strong> להשלמת המשימה.</div>
+                </div>
+            `;
+        }
+    }
+};
+
+window.finishPhishing = () => {
+    showToast("סימולציה הושלמה", "זיהית בהצלחה את כל סימני האזהרה באימייל! זכור: תמיד בדוק את זהות השולח ואת הלינקים לפני הלחיצה.", () => {
+        nextSlide();
+    });
+};
+
+        function nextSlide() {
+            if (currentIndex < screens.length - 1) {
+                renderSlide(currentIndex + 1);
+            } else {
+                finishCourse();
+            }
         }
 
         async function loadData() {
@@ -177,7 +288,7 @@
                 prevBtn.style.display = (currentIndex > 0) ? 'flex' : 'none';
                 nextBtn.style.display = 'flex';
                 nextBtn.innerHTML = (currentIndex === screens.length - 1) ? 'סיום ויציאה' : 'המשך <i class="fas fa-chevron-left" style="margin-right:8px;"></i>';
-                nextBtn.onclick = () => renderSlide(currentIndex + 1);
+                nextBtn.onclick = nextSlide;
                 return;
             }
 
@@ -186,7 +297,7 @@
             
             if (isSplash) {
                 nextBtn.innerHTML = 'התחל למידה <i class="fas fa-play" style="margin-right:8px;"></i>';
-                nextBtn.onclick = () => renderSlide(currentIndex + 1);
+                nextBtn.onclick = nextSlide;
             } else if (isQ) {
                 nextBtn.innerHTML = 'בדוק תשובה <i class="fas fa-check" style="margin-right:8px;"></i>';
                 nextBtn.onclick = checkAnswer;
@@ -196,7 +307,7 @@
                     nextBtn.onclick = finishCourse;
                 } else {
                     nextBtn.innerHTML = 'המשך <i class="fas fa-chevron-left" style="margin-right:8px;"></i>';
-                    nextBtn.onclick = () => renderSlide(currentIndex + 1);
+                    nextBtn.onclick = nextSlide;
                 }
             }
         }
@@ -299,18 +410,47 @@
                 isSubmitted = false;
             }
 
+            // --- Aggressive Reset & Early Locking ---
+            // We disable the button immediately if there's any reason it might need to be locked.
+            // This prevents it from being enabled for even a single frame during re-render.
+            const hasRequirement = (screen.minDelay > 0 || screen.waitForAudio || screen.cards || screen.type === 'phishing-test');
+            if (hasRequirement && !isSubmitted && !screen.question) {
+                nextBtn.disabled = true;
+                nextBtn.style.opacity = '0.5';
+                nextBtn.style.pointerEvents = 'none';
+            } else {
+                nextBtn.disabled = false;
+                nextBtn.style.opacity = '1';
+                nextBtn.style.pointerEvents = 'auto';
+            }
+
             // UI
+            // UI - Background
             if (screen.bgImage) {
                 const bgUrl = resolveAssetPath(screen.bgImage);
                 playerContainer.style.backgroundImage = `url('${encodeURI(bgUrl)}')`;
                 console.log(`[StudioPlayer] Setting background: ${bgUrl}`);
-                
-                // Diagnostic check
-                const testImg = new Image();
-                testImg.onerror = () => console.warn(`[StudioPlayer] Background IMAGE NOT FOUND: ${bgUrl}`);
-                testImg.src = bgUrl;
             } else {
-                playerContainer.style.backgroundImage = 'none';
+                // Fallback to high-quality system backgrounds
+                let fallbackBg = 'bg_content.png';
+                if (index === 0) fallbackBg = 'bg_welcome.png';
+                else if (screen.question) fallbackBg = 'bg_quiz.png';
+                else if (index === screens.length - 1) fallbackBg = 'bg_summary.png';
+                
+                const bgUrl = resolveAssetPath(fallbackBg);
+                playerContainer.style.backgroundImage = `url('${encodeURI(bgUrl)}')`;
+                console.log(`[StudioPlayer] Using fallback background: ${fallbackBg}`);
+            }
+
+            // Diagnostic check for background
+            const currentBg = playerContainer.style.backgroundImage;
+            if (currentBg && currentBg !== 'none') {
+                const urlMatch = currentBg.match(/url\("?(.+?)"?\)/);
+                if (urlMatch) {
+                    const testImg = new Image();
+                    testImg.onerror = () => console.warn(`[StudioPlayer] Background IMAGE NOT FOUND: ${urlMatch[1]}`);
+                    testImg.src = urlMatch[1];
+                }
             }
 
             // Character
@@ -335,12 +475,16 @@
             if (cSection) cSection.style.display = 'flex';
 
             // Main Content
-            let html = `<h1>${screen.title || ''}</h1>`;
+            let html = screen.title ? `<h1 class="cyber-glitch animate-in">${screen.title}</h1>` : '';
             if (screen.question) {
-                html += `<p class="question-text">${screen.question.text || ''}</p>`;
+                if (screen.question.text) {
+                    html += `<p class="question-text animate-in delay-1">${screen.question.text}</p>`;
+                }
                 html += `<div class="options-list" style="margin-top:25px; ${isSubmitted ? 'pointer-events: none;' : ''}">
                     ${(screen.question.options || []).map((opt, i) => {
-                        let cls = 'option';
+                        let cls = 'option animate-in';
+                        cls += ` delay-${Math.min(i + 2, 4)}`;
+                        
                         if (isSubmitted) {
                             const correctIdx = (screen.question.options || []).findIndex(o => o.correct);
                             if (i === correctIdx) cls += ' correct';
@@ -351,13 +495,123 @@
                         return `<div class="${cls}" data-idx="${i}">${opt.text || ''}</div>`;
                     }).join('')}
                 </div>`;
-            } else {
-                html += `<p>${screen.content || ''}</p>`;
+            } else if (screen.type === 'phishing-test') {
+                window.foundFlags = new Set();
+                window.totalFlags = 3;
+                html += `
+                    <div class="phishing-container animate-in delay-2" style="text-align: right; direction: rtl; max-width: 800px; margin: 0 auto; display: flex; flex-direction: column;">
+                        <div style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px;">
+                            <p style="margin: 0; font-size: 1.15rem; font-weight: 600; color: #e2e8f0; line-height: 1.4;">${screen.content || 'זהה את כל נורות האזהרה באימייל הבא:'}</p>
+                            <div class="phishing-counter" style="align-self: flex-start; margin: 0; padding: 6px 16px; background: rgba(56, 189, 248, 0.1); border: 1px solid #38bdf8; border-radius: 20px; color: #38bdf8; font-size: 0.95rem; white-space: nowrap;">
+                                מצא תקלות אבטחה: <strong id="phishing-counter-text" style="color: white; margin-right: 5px;">0 מתוך ${window.totalFlags}</strong>
+                            </div>
+                        </div>
+                        
+                        <!-- Visual Feedback Area - compact and potentially absolute or semi-absolute -->
+                        <div id="phishing-feedback-area" style="min-height: 5px; margin-bottom: 10px; flex-shrink: 0;"></div>
+                        
+                        <div class="email-mockup delay-3" style="font-size: 0.85rem; max-height: 48vh; overflow-y: auto; color: #1e293b; background: #ffffff; flex-grow: 1;">
+                            <div class="email-os-header" style="padding: 8px 15px;">
+                                <div>דואר נכנס - Outlook</div>
+                                <div class="email-os-controls">
+                                    <div class="os-min"></div>
+                                    <div class="os-max"></div>
+                                    <div class="os-close"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Email Toolbar -->
+                            <div style="background: #f1f5f9; border-bottom: 1px solid #e2e8f0; padding: 8px 15px; display: flex; gap: 15px; align-items: center; justify-content: space-between;">
+                                <div style="display: flex; gap: 15px;">
+                                    <div style="color: #64748b; cursor: not-allowed; opacity: 0.6;"><i class="fas fa-reply" style="margin-left: 5px;"></i>השב</div>
+                                    <div style="color: #64748b; cursor: not-allowed; opacity: 0.6;"><i class="fas fa-reply-all" style="margin-left: 5px;"></i>השב לכולם</div>
+                                    <div style="color: #64748b; cursor: not-allowed; opacity: 0.6;"><i class="fas fa-share" style="margin-left: 5px;"></i>העבר</div>
+                                    <div style="color: #64748b; cursor: not-allowed; opacity: 0.6;"><i class="fas fa-trash" style="margin-left: 5px;"></i>מחק</div>
+                                </div>
+                                <button id="report-simulation-btn" class="btn-report locked" onclick="window.finishPhishing()" style="background: #ef4444; color: white; padding: 6px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-family: Assistant; opacity: 0.5; pointer-events: none; transition: all 0.3s; box-shadow: 0 4px 10px rgba(239,68,68,0.3); font-size: 0.85rem;">
+                                    <i class="fas fa-exclamation-triangle" style="margin-left: 5px;"></i>דווח פישינג
+                                </button>
+                            </div>
+                            
+                            <div class="email-header" style="background: #ffffff; padding: 15px 20px;">
+                                <div class="email-header-row" style="margin-bottom: 8px;">
+                                    <div class="email-header-label" style="width: 50px;">מאת:</div>
+                                    <div class="sender-pill" style="padding: 2px 10px 2px 12px;">
+                                        <div class="sender-icon" style="width: 20px; height: 20px; font-size: 0.6rem;"><i class="fas fa-user"></i></div>
+                                        <span style="font-size: 0.9rem;">שירות לקוחות</span>
+                                        <span class="phishing-flag text-flag" title="http://paypa1-security-check.com/" onclick="window.handleFlagClick(this, 'sender')" style="margin-right: 6px; color: #2563eb; direction: ltr; padding-right: 6px; font-size: 0.9rem;">&lt;service@paypa1.co.il&gt;</span>
+                                    </div>
+                                </div>
+                                <div class="email-header-row" style="font-size: 0.85rem; margin-bottom: 8px;">
+                                    <div class="email-header-label" style="width: 50px;">אל:</div>
+                                    <div style="direction: ltr;">user@company.co.il</div>
+                                </div>
+                                <div style="display: flex; align-items: center; font-size: 0.9rem;">
+                                    <div class="email-header-label" style="width: 50px;">נושא:</div>
+                                    <div style="font-weight: 700; font-size: 1rem; flex-grow: 1;">דחוף: פעילות חריגה בחשבונך</div>
+                                    <div style="color: #9ca3af; font-size: 0.8rem;">היום, 09:14</div>
+                                </div>
+                            </div>
+                            <div class="email-body" style="padding: 12px 20px; line-height: 1.5; color: #334155; pointer-events: auto;">
+                                <p style="margin-bottom: 12px; color: #334155;">שלום <span class="phishing-flag text-flag" onclick="window.handleFlagClick(this, 'greeting')" style="padding: 2px 4px; border-radius: 4px;">לקוח יקר</span>,</p>
+                                <p style="margin-bottom: 12px; color: #334155;">זיהינו פעילות חריגה בחשבון שלך ממכשיר לא מזוהה. מטעמי אבטחה, החשבון שלך הוגבל באופן זמני.</p>
+                                <p style="margin-bottom: 18px; color: #334155;">אנא הקלק על הקישור הבא לאימות זהותך. יש לבצע את הפעולה תוך 24 שעות, אחרת חשבונך יינעל לצמיתות:</p>
+                                
+                                <div style="text-align: center; margin: 20px 0; position: relative;" title="http://paypa1-security-check.com/login-action.php">
+                                    <span class="phishing-flag phishing-action-btn" onclick="window.handleFlagClick(this, 'link')" style="box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-size: 0.95rem; padding: 10px 25px; display: inline-block;">התחברות לאימות מהיר</span>
+                                </div>
+                                
+                                <p style="margin-bottom: 3px; color: #334155;">בברכה,</p>
+                                <p style="color: #6b7280; font-size: 0.85rem; margin-bottom: 0;">צוות התמיכה והאבטחה - מאובטח</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (screen.content || screen.cards || screen.alerts) {
+                if (screen.content) {
+                    html += `<div class="content-text animate-in delay-1" id="typing-content"></div>`;
+                }
+                
+                if (screen.alerts) {
+                    html += `<div class="alerts-container">
+                        ${(screen.alerts || []).map((alert, i) => {
+                            const animClass = alert.animation ? `anim-${alert.animation}` : `animate-in delay-${Math.min(i+2, 4)}`;
+                            const customDelay = alert.delay !== undefined ? `animation-delay: ${alert.delay}s;` : '';
+                            return `
+                                <div class="alert-box ${alert.type || 'info'} ${animClass}" style="${customDelay}">
+                                    <i class="${alert.icon || 'fas fa-info-circle'}"></i>
+                                    <div class="alert-content">
+                                        <h4>${alert.title || ''}</h4>
+                                        <p>${alert.text || ''}</p>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>`;
+                }
+
+                if (screen.cards) {
+                    html += `<div class="info-cards-container">
+                        ${(screen.cards || []).map((card, i) => `
+                            <div class="info-card animate-in delay-${Math.min(i+2, 4)}" onclick="window.toggleCard(this)">
+                                <div class="card-inner">
+                                    <div class="card-front">
+                                        <i class="${card.icon || 'fas fa-shield-alt'}"></i>
+                                        <h3>${card.title || ''}</h3>
+                                    </div>
+                                    <div class="card-back">
+                                        <p>${card.text || ''}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>`;
+                }
             }
 
             if (screen.id === 'officer_details' && screen.officer) {
                 html += `
-                    <div class="officer-card" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 20px; padding: 25px; margin-top: 20px;">
+                    <div class="officer-card animate-in delay-3" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 20px; padding: 25px; margin-top: 20px;">
                         <div class="officer-info" style="display: flex; flex-direction: column; gap: 12px;">
                             <div class="officer-field" style="font-size: 1.1rem; color: #e2e8f0;"><strong>שם:</strong> <span>${screen.officer.name}</span></div>
                             <div class="officer-field" style="font-size: 1.1rem; color: #e2e8f0;"><strong>תפקיד:</strong> <span>${screen.officer.role}</span></div>
@@ -368,6 +622,14 @@
                 `;
             }
             contentArea.innerHTML = html;
+
+            // Trigger typing effect if content exists
+            const typingEl = document.getElementById('typing-content');
+            if (typingEl && screen.content) {
+                // If it was already visited, maybe skip typing? 
+                // For now, always type for engagement.
+                typeEffect(typingEl, screen.content);
+            }
 
             // Attach listeners to options
             if (screen.question) {
@@ -387,14 +649,36 @@
             let timerFinished = minDelay <= 0;
 
             const checkUnlock = () => {
-                if (audioFinished && timerFinished) {
+                // Safeguard: Ensure this check only applies to the slide that is currently visible
+                if (index !== currentIndex) return;
+
+                // Dynamically determine completion based on actual DOM elements
+                // This is safer than relying on the screen.cards data length alone
+                const allCards = contentArea.querySelectorAll('.info-card');
+                const flippedCards = contentArea.querySelectorAll('.info-card.was-flipped');
+                const cardsDone = allCards.length === 0 || flippedCards.length >= allCards.length;
+
+                if (audioFinished && timerFinished && cardsDone) {
                     nextBtn.disabled = false;
                     nextBtn.style.opacity = '1';
                     nextBtn.style.pointerEvents = 'auto';
+
+                    // Persist that the slide's requirements are met
+                    const slideId = screen.id || `s${index}`;
+                    if (!questionStates[slideId]) questionStates[slideId] = {};
+                    questionStates[slideId].isSubmitted = true;
+                    saveState();
                 }
             };
 
-            if ((minDelay > 0 || (waitForAudio && screen.audio)) && !isSubmitted && !screen.question) {
+            // Hook for external activities (like flipping cards)
+            window.onSlideActivity = () => {
+                checkUnlock();
+            };
+
+            // Initial lock check is now done at the start of renderSlide for responsiveness,
+            // but we re-verify here in case logic changed during rendering.
+            if ((minDelay > 0 || (waitForAudio && screen.audio) || contentArea.querySelector('.info-card')) && !isSubmitted && !screen.question) {
                 nextBtn.disabled = true;
                 nextBtn.style.opacity = '0.5';
                 nextBtn.style.pointerEvents = 'none';
@@ -433,7 +717,9 @@
                 setTimeout(() => {
                     const status = `<span class="feedback-status info">כבר ענית על שאלה זו</span>`;
                     const feedback = screen.question.feedback || "התשובה הנכונה מסומנת בירוק.";
-                    showToast(screen.question.text || "", `${status}<br><br>${feedback}`, () => renderSlide(currentIndex + 1));
+                    const selOpt = screen.question.options[selectedIndex];
+                    const selText = selOpt ? selOpt.text : "";
+                    showToast(screen.question.text || "", `${status}<br><br>${feedback}`, () => renderSlide(currentIndex + 1), null, selText);
                 }, 300);
             }
         }
@@ -463,12 +749,16 @@
             });
 
             const questionText = screen.question.text || "";
+            const selText = opts[selectedIndex] ? opts[selectedIndex].text : "";
+
             if (selectedIndex === correctIdx) {
                 score++;
-                showToast(questionText, `<span class="feedback-status correct">תשובה נכונה</span><br><br>כל הכבוד! נכון מאוד.`, () => renderSlide(currentIndex + 1));
+                showToast(questionText, `<span class="feedback-status correct">תשובה נכונה</span><br><br>כל הכבוד! נכון מאוד.`, () => renderSlide(currentIndex + 1), null, selText);
+                document.getElementById('toast').classList.add('pulse-correct');
             } else {
                 const feedback = screen.question.feedback || "לא נורא, התשובה הנכונה מסומנת בירוק.";
-                showToast(questionText, `<span class="feedback-status incorrect">תשובה לא נכונה</span><br><br>${feedback}`, () => renderSlide(currentIndex + 1));
+                showToast(questionText, `<span class="feedback-status incorrect">תשובה לא נכונה</span><br><br>${feedback}`, () => renderSlide(currentIndex + 1), null, selText);
+                document.getElementById('toast').classList.add('pulse-incorrect');
             }
             answeredCount++;
             
@@ -480,21 +770,31 @@
             saveState();
         }
 
-        function showToast(title, msg, onContinue = null, btnText = null) {
+        function showToast(title, msg, onContinue = null, btnText = null, selectedAnswer = null) {
             const t = document.getElementById('toast');
             const isFinish = (title === "סיום לומדה" || title === "סיום הלומדה" || title === "סיכום לומדה");
             t.classList.toggle('finish-toast', isFinish);
             
             t.innerHTML = `
-                <div style="border-bottom: 2px solid var(--primary); padding-bottom: 15px; margin-bottom: 20px;">
+                <div style="border-bottom: 2px solid var(--primary); padding-bottom: 15px; margin-bottom: 20px; text-align: right;">
                     <h3 style="color: var(--primary); font-size: 1.2rem; margin-bottom: 10px;">${isFinish ? "סיכום לומדה" : (title === "שימו לב" ? "" : "השאלה:")}</h3>
-                    <p style="font-weight: 500; font-size: 1.1rem;">${title}</p>
+                    <p style="font-weight: 500; font-size: 1.1rem; margin-bottom: 0;">${title}</p>
+                    
+                    ${selectedAnswer ? `
+                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1);">
+                            <span style="color: var(--primary); font-weight: 700; font-size: 0.9rem; display: block; margin-bottom: 5px;">התשובה שבחרת:</span>
+                            <p style="font-weight: 700; font-size: 1.1rem; color: #fff; margin: 0;">${selectedAnswer}</p>
+                        </div>
+                    ` : ''}
                 </div>
                 ${isFinish ? '<h3>תוצאות</h3>' : ''}
-                <p>${msg}</p>
-                <button class="btn btn-primary" style="margin-top:20px; width:100%" id="toast-close">${btnText || (isFinish ? "סגור לומדה" : "המשך ללמידה")}</button>
+                <div class="animate-in delay-1">
+                    <p>${msg}</p>
+                </div>
+                <button class="btn btn-primary animate-in delay-2" style="margin-top:20px; width:100%" id="toast-close">${btnText || (isFinish ? "סגור לומדה" : "המשך ללמידה")}</button>
             `;
             t.style.display = 'block';
+            t.classList.remove('pulse-correct', 'pulse-incorrect'); // Reset classes
 
             // Disable all other interactions by adding a modal backdrop
             let overlay = document.getElementById('toast-backdrop');
@@ -575,12 +875,13 @@
             const logoColor = firstScreen.logoBgColor || '#38bdf8';
             const logoBg = hexToRgba(logoColor, 0.1);
 
-            // Set background from first slide for sense of continuity
+            // Set background for splash screen
             if (firstScreen.bgImage) {
                 const bgUrl = resolveAssetPath(firstScreen.bgImage);
                 playerContainer.style.backgroundImage = `url('${encodeURI(bgUrl)}')`;
             } else {
-                playerContainer.style.backgroundImage = 'none';
+                const bgUrl = resolveAssetPath('bg_welcome.png');
+                playerContainer.style.backgroundImage = `url('${encodeURI(bgUrl)}')`;
             }
 
             const cSection = document.getElementById('character-section');
@@ -603,10 +904,10 @@
             const content = "לחצו על הכפתור למטה כדי להתחיל בלמידה.";
 
             contentArea.innerHTML = `
-                <div class="splash-view" style="text-align: center;">
+                <div class="splash-view animate-in" style="text-align: center;">
                     ${logoHtml}
-                    <h1 style="color: ${logoColor};">${title}</h1>
-                    <p style="margin-bottom: 20px;">${content}</p>
+                    <h1 class="cyber-glitch" style="color: ${logoColor}; font-size: 2.5rem; margin-top: 15px;">${title}</h1>
+                    <p class="animate-in delay-1" style="margin-bottom: 20px; font-size: 1.2rem;">${content}</p>
                 </div>
             `;
 

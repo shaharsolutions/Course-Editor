@@ -251,8 +251,23 @@ header h1 {
     height: 100vh;
     overflow-y: auto;
     padding: 0;
-    background-color: var(--bg-dark);
+    background-color: #0c111d;
+    background-image: 
+        linear-gradient(rgba(56, 189, 248, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56, 189, 248, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
     position: relative;
+}
+
+#workspace::before {
+    content: "";
+    position: fixed;
+    top: 50%; left: 50%; width: 60vw; height: 60vh;
+    background: radial-gradient(circle at center, rgba(56, 189, 248, 0.04) 0%, transparent 70%);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 0;
+    filter: blur(80px);
 }
 
 .workspace-header {
@@ -833,7 +848,7 @@ input:checked + .slider:before {
     width: 42%; max-width: 550px; max-height: 75%;
     background: rgba(15, 23, 42, 0.95); border: 1px solid var(--border);
     border-radius: 20px; padding: 35px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    z-index: 10; display: flex; flex-direction: column; text-align: right;
+    z-index: 200; display: flex; flex-direction: column; text-align: right;
     direction: rtl; overflow-y: auto; backdrop-filter: blur(10px);
 }
 
@@ -951,4 +966,275 @@ input:checked + .slider:before {
     .content-area-mockup { width: 92%; left: 4%; top: 40%; padding: 20px; }
     .content-area-mockup h1 { font-size: 1.4rem; }
     .mockup-btn { min-width: 110px; padding: 10px 15px; font-size: 0.85rem; }
+}
+
+/* --- New Editor Components --- */
+.option-item-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: all 0.2s;
+}
+
+.option-item-vertical:hover {
+    border-color: var(--primary);
+    background: rgba(56, 189, 248, 0.02);
+}
+
+.glass-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+}
+
+.option-item-vertical select {
+    background: var(--bg-dark);
+    font-size: 0.85rem;
+    padding: 8px 12px;
+}
+
+
+.option-item-vertical textarea {
+    font-size: 0.9rem;
+    background: var(--bg-dark);
+    padding: 10px;
+    min-height: 80px;
+}
+
+/* --- Interactive Components in Mockup --- */
+.info-cards-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-top: 20px;
+    direction: rtl;
+}
+
+.info-card {
+    height: 120px;
+    cursor: pointer;
+    perspective: 1000px;
+    position: relative;
+    z-index: 110; /* Above his parent for safe clicking */
+}
+
+.info-card:hover {
+    transform: translateY(-3px);
+}
+
+.card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transform-style: preserve-3d;
+    pointer-events: none; /* Let parent handle click */
+}
+
+.info-card.flipped .card-inner {
+    transform: rotateY(180deg);
+}
+
+.card-front, .card-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+}
+
+.card-front {
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
+.card-front i {
+    font-size: 1.5rem;
+    color: var(--primary);
+    margin-bottom: 8px;
+}
+
+.card-front h3 {
+    font-size: 0.9rem;
+    margin: 0;
+    color: white !important;
+}
+
+.card-back {
+    background: var(--bg-surface);
+    color: white;
+    transform: rotateY(180deg);
+    border: 1px solid var(--primary);
+    font-size: 0.8rem;
+    overflow-y: auto;
+}
+
+/* Alert Boxes */
+.alert-box {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    border-right: 4px solid var(--primary);
+    margin-bottom: 15px;
+    direction: rtl;
+}
+
+.alert-box.danger { border-right-color: var(--error); }
+.alert-box.warning { border-right-color: var(--warning); }
+
+.alert-box .alert-content strong {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--text-main);
+}
+
+/* Animation & Special Effects (Sync from Player) */
+.animate-in { opacity: 0; animation: slideUpFade 0.6s forwards; }
+.delay-1 { animation-delay: 0.1s; }
+.delay-2 { animation-delay: 0.2s; }
+.delay-3 { animation-delay: 0.3s; }
+.delay-4 { animation-delay: 0.4s; }
+
+@keyframes slideUpFade {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.cyber-glitch {
+    position: relative;
+    text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75),
+                -0.025em -0.05em 0 rgba(0, 255, 0, 0.75),
+                0.025em 0.05em 0 rgba(0, 0, 255, 0.75);
+    animation: glitch 5s infinite;
+}
+
+@keyframes glitch {
+    0% { text-shadow: 0.05em 0 0 rgba(255,0,0,0.75), -0.05em -0.025em 0 rgba(0,255,0,0.75), -0.025em 0.05em 0 rgba(0,0,255,0.75); }
+    15% { text-shadow: -0.05em -0.025em 0 rgba(255,0,0,0.75), 0.025em 0.025em 0 rgba(0,255,0,0.75), -0.05em -0.05em 0 rgba(0,0,255,0.75); }
+    50% { text-shadow: 0.025em 0.05em 0 rgba(255,0,0,0.75), 0.05em 0 0 rgba(0,255,0,0.75), 0 -0.05em 0 rgba(0,0,255,0.75); }
+    100% { text-shadow: -0.025em 0 0 rgba(255,0,0,0.75), -0.025em -0.025em 0 rgba(0,255,0,0.75), -0.025em -0.05em 0 rgba(0,0,255,0.75); }
+}
+
+/* Email Mockup Component CSS */
+.email-mockup {
+    background: #ffffff;
+    color: #1f2937;
+    border-radius: 10px;
+    padding: 0;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    direction: rtl;
+    text-align: right;
+    border: 1px solid #d1d5db;
+    font-family: inherit;
+}
+
+.email-os-header {
+    background: #f3f4f6;
+    padding: 10px 15px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    color: #4b5563;
+    font-weight: 600;
+}
+
+.email-os-controls { display: flex; gap: 8px; direction: ltr; }
+.email-os-controls div { width: 12px; height: 12px; border-radius: 50%; }
+.os-close { background: #ef4444; }
+.os-min { background: #f59e0b; }
+.os-max { background: #10b981; }
+
+.email-header {
+    background: #f8fafc;
+    padding: 20px 25px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 0.95rem;
+}
+
+.email-header-row { display: flex; margin-bottom: 12px; align-items: center; }
+.email-header-label { width: 60px; color: #64748b; font-weight: 600; }
+
+.sender-pill {
+    display: flex;
+    align-items: center;
+    background: #f1f5f9;
+    padding: 4px 12px 4px 15px;
+    border-radius: 20px;
+    border: 1px solid #e2e8f0;
+}
+
+.sender-icon {
+    width: 24px;
+    height: 24px;
+    background: #0ea5e9;
+    color: white;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin-left: 10px; font-size: 0.8rem;
+}
+
+.email-body {
+    padding: 30px 25px;
+    line-height: 1.7;
+    font-size: 1.05rem;
+    color: #334155 !important;
+}
+
+.email-body p {
+    color: #334155 !important;
+}
+
+/* Custom Scrollbar for Email Mockup */
+.email-mockup::-webkit-scrollbar {
+    width: 10px;
+    background: #f1f5f9;
+}
+.email-mockup::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 5px;
+}
+.email-mockup::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.phishing-action-btn {
+    background: #0070ba; 
+    color: white !important; 
+    padding: 12px 35px; 
+    border-radius: 25px; 
+    text-decoration: none; 
+    font-weight: bold; 
+    display: inline-block;
+    cursor: pointer;
+}
+
+li.dragging {
+    opacity: 0.5;
+    background: rgba(56, 189, 248, 0.2) !important;
+    border-color: var(--primary) !important;
+}
+
+li[draggable="true"] {
+    cursor: grab;
+}
+
+li[draggable="true"]:active {
+    cursor: grabbing;
 }

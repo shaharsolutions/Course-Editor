@@ -39,14 +39,26 @@
             </div>
             
             <div id="bulk-actions" class="hidden" style="padding: 16px 24px; border-bottom: 1px solid var(--border);">
-                <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--accent); margin-bottom: 12px;">
-                    <i class="fas fa-layer-group"></i> עריכה גלובלית
+                <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--accent); margin-bottom: 15px;">
+                    <i class="fas fa-layer-group"></i> עריכה גלובלית (<span id="selected-count">0</span> שקפים)
                 </h4>
-                <div class="form-group">
+                
+                <div class="form-group" style="margin-bottom: 15px;">
                     <label style="font-size: 0.75rem;">זמן השהייה (שניות)</label>
                     <div style="display: flex; gap: 8px;">
-                        <input type="number" id="bulk-min-delay" min="0" value="0" style="padding: 8px;">
-                        <button id="apply-bulk-delay" class="primary-btn small-btn">החל</button>
+                        <input type="number" id="bulk-min-delay" min="0" value="0" style="padding: 8px; flex-grow: 1;">
+                        <button id="apply-bulk-delay" class="primary-btn small-btn" style="padding: 8px 16px;">החל</button>
+                    </div>
+                </div>
+
+                <div class="form-group inline-group" style="margin-bottom: 5px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;">
+                    <label class="switch">
+                        <input type="checkbox" id="bulk-wait-audio">
+                        <span class="slider round"></span>
+                    </label>
+                    <div style="display: flex; flex-direction: column; margin-right: 10px;">
+                        <span style="font-size: 0.85rem; font-weight: 600;">עצירת התקדמות עד סיום קריינות</span>
+                        <button id="apply-bulk-audio-lock" class="text-btn" style="font-size: 0.7rem; color: var(--primary); background: none; border: none; padding: 0; text-align: right; cursor: pointer; text-decoration: underline; margin-top: 4px;">החל על הנבחרים</button>
                     </div>
                 </div>
             </div>
@@ -194,7 +206,38 @@
                         </div>
 
                         <div class="feature-card glass">
+                            <h3><i class="fas fa-exclamation-circle"></i> תיבות התראה (Alerts)</h3>
+                            <div class="options-section">
+                                <label style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span>רשימת התראות</span>
+                                    <button type="button" id="add-alert-btn" class="upload-btn" style="padding: 4px 12px; font-size: 0.75rem;">
+                                        <i class="fas fa-plus"></i> הוסף
+                                    </button>
+                                </label>
+                                <div id="alerts-container">
+                                    <!-- Alerts will be dynamic -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="feature-card glass">
+                            <h3><i class="fas fa-th-large"></i> כרטיסיות מידע (Flip Cards)</h3>
+                            <div class="options-section">
+                                <label style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span>רשימת כרטיסיות</span>
+                                    <button type="button" id="add-card-btn" class="upload-btn" style="padding: 4px 12px; font-size: 0.75rem;">
+                                        <i class="fas fa-plus"></i> הוסף
+                                    </button>
+                                </label>
+                                <div id="cards-container">
+                                    <!-- Cards will be dynamic -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="feature-card glass">
                             <h3><i class="fas fa-tasks"></i> אינטראקציה (שאלה)</h3>
+                            
                             <div class="form-group inline-group" style="margin-bottom: 20px;">
                                 <label class="switch">
                                     <input type="checkbox" id="is-question" onchange="toggleQuestionFields()">
