@@ -188,9 +188,9 @@ window.handleFlagClick = (el, id) => {
         feedbackArea.classList.add('animate-in');
         
         feedbackArea.innerHTML = `
-            <div style="background: rgba(254,242,242,0.95); border-right: 4px solid #ef4444; padding: 8px 12px; border-radius: 8px; color: #1e293b; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 5px;">
-                <i class="fas fa-exclamation-triangle" style="color: #ef4444; float: right; margin-left: 10px; font-size: 1rem; margin-top: 2px;"></i>
-                <div style="margin-right: 25px; line-height: 1.3; font-size: 0.85rem;">${msgs[id] || 'זיהית סימן מחשיד'}</div>
+            <div class="animate-in" style="background: rgba(15, 23, 42, 0.9); border-right: 4px solid #ef4444; padding: 10px 14px; border-radius: 10px; color: #f8fafc; box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-bottom: 8px;">
+                <i class="fas fa-exclamation-triangle" style="color: #f87171; float: right; margin-left: 12px; font-size: 1.1rem; margin-top: 2px;"></i>
+                <div style="margin-right: 32px; line-height: 1.4; font-size: 0.9rem;">${msgs[id] || 'זיהית סימן מחשיד'}</div>
             </div>
         `;
     }
@@ -211,8 +211,8 @@ window.updatePhishingCounter = (lastFeedbackHtml) => {
     let clueHtml = '';
     if (window.foundFlags.size === 2 && window.foundFlags.has('sender') && window.foundFlags.has('greeting')) {
         clueHtml = `
-            <div class="animate-in" style="background: rgba(56,189,248,0.15); border-right: 4px solid #38bdf8; padding: 8px 12px; border-radius: 8px; color: #0369a1; margin-top: 8px; font-size: 0.9rem; display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-arrow-down-long" style="color: #38bdf8; font-size: 1.2rem; animation: bounceY 1s infinite;"></i>
+            <div class="animate-in" style="background: rgba(56,189,248,0.15); border-right: 4px solid #38bdf8; padding: 10px 14px; border-radius: 10px; color: #e0f2fe; margin-top: 8px; font-size: 0.9rem; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                <i class="fas fa-arrow-down-long" style="color: #38bdf8; font-size: 1.3rem; animation: bounceY 1s infinite;"></i>
                 <span>נראה שיש פה עוד משהו... <strong>בואו נגלול קצת מטה</strong> להמשך המייל.</span>
             </div>
         `;
@@ -233,16 +233,16 @@ window.updatePhishingCounter = (lastFeedbackHtml) => {
         
         if (lastFeedbackHtml) {
             feedbackArea.innerHTML = `
-                <div class="animate-in" style="background: rgba(254,242,242,0.9); border-right: 4px solid #ef4444; padding: 8px 12px; border-radius: 8px; color: #1e293b; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 8px;">
-                    <i class="fas fa-exclamation-triangle" style="color: #ef4444; float: right; margin-left: 12px; font-size: 1.1rem; margin-top: 2px;"></i>
-                    <div style="margin-right: 30px; line-height: 1.4; font-size: 0.85rem;">${lastFeedbackHtml}</div>
+                <div class="animate-in" style="background: rgba(15, 23, 42, 0.9); border-right: 4px solid #ef4444; padding: 10px 14px; border-radius: 10px; color: #f8fafc; box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-bottom: 10px;">
+                    <i class="fas fa-exclamation-triangle" style="color: #f87171; float: right; margin-left: 12px; font-size: 1.1rem; margin-top: 2px;"></i>
+                    <div style="margin-right: 32px; line-height: 1.4; font-size: 0.9rem;">${lastFeedbackHtml}</div>
                 </div>
-                <div class="animate-in delay-1" style="background: rgba(34,197,94,0.15); border-right: 4px solid #22c55e; padding: 8px 12px; border-radius: 8px; color: #166534; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px dashed #22c55e;">
-                    <i class="fas fa-check-circle" style="color: #22c55e; float: right; margin-left: 12px; font-size: 1.1rem; margin-top: 2px;"></i>
-                    <div style="margin-right: 30px; line-height: 1.4; font-size: 0.9rem;"><strong>כל הכבוד!</strong> מצאת את הכל.</div>
+                <div class="animate-in delay-1" style="background: rgba(34,197,94,0.15); border-right: 4px solid #22c55e; padding: 10px 14px; border-radius: 10px; color: #f8fafc; box-shadow: 0 4px 15px rgba(0,0,0,0.2); border: 1px dashed #22c55e; margin-bottom: 10px;">
+                    <i class="fas fa-check-circle" style="color: #4ade80; float: right; margin-left: 12px; font-size: 1.1rem; margin-top: 2px;"></i>
+                    <div style="margin-right: 32px; line-height: 1.4; font-size: 0.9rem;"><strong>כל הכבוד!</strong> מצאת את הכל.</div>
                 </div>
-                <div class="animate-in delay-2" style="background: rgba(34,197,94,0.1); border-right: 4px solid #22c55e; padding: 8px 12px; border-radius: 8px; color: #166534; margin-top: 8px; font-size: 0.95rem; display: flex; align-items: center; gap: 10px;">
-                    <i class="fas fa-arrow-up-long" style="color: #22c55e; font-size: 1.2rem; animation: bounceYRev 1s infinite;"></i>
+                <div class="animate-in delay-2" style="background: rgba(15, 23, 42, 0.8); border-right: 4px solid #22c55e; padding: 10px 14px; border-radius: 10px; color: #f8fafc; margin-top: 8px; font-size: 0.95rem; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                    <i class="fas fa-arrow-up-long" style="color: #4ade80; font-size: 1.3rem; animation: bounceYRev 1s infinite;"></i>
                     <span>עכשיו רק נשאר <strong>לגלול חזרה למעלה</strong> ולדווח.</span>
                 </div>
             `;
@@ -491,7 +491,15 @@ window.finishPhishing = () => {
 
             // UI
             // Update UI - Background
-            if (screen.bgImage) {
+            const lowerTitle = (screen.title || '').toLowerCase();
+            const lowerContent = (screen.content || '').toLowerCase();
+            const isQ = screen.question || screen.type === 'phishing-test' || 
+                        lowerTitle.includes('בוחן') || lowerTitle.includes('בדיק') || 
+                        lowerTitle.includes('שאלה') || lowerTitle.includes('מבחן') ||
+                        lowerContent.includes('שאלות') || lowerContent.includes('סיכום') ||
+                        lowerTitle.includes('בואו נבדוק');
+
+            if (screen.bgImage && screen.bgImage !== 'none' && screen.bgImage !== '') {
                 const bgUrl = resolveAssetPath(screen.bgImage);
                 playerContainer.style.backgroundImage = `url('${encodeURI(bgUrl)}')`;
                 console.log(`[StudioPlayer] Setting background: ${bgUrl}`);
@@ -499,8 +507,8 @@ window.finishPhishing = () => {
                 // Fallback to high-quality system backgrounds
                 let fallbackBg = 'bg_content.png';
                 if (index === -1 || index === 0) fallbackBg = 'bg_welcome.png';
-                else if (screen.question) fallbackBg = 'bg_quiz.png';
-                else if (index === screens.length - 1) fallbackBg = 'bg_summary.png';
+                else if (isQ) fallbackBg = 'bg_quiz.png';
+                else if (index === (screens.length - 1)) fallbackBg = 'bg_summary.png';
                 
                 const bgUrl = resolveAssetPath(fallbackBg);
                 playerContainer.style.backgroundImage = `url('${encodeURI(bgUrl)}')`;
