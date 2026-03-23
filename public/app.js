@@ -165,8 +165,9 @@ if (courseFileInput) {
         try {
             uploadStatus.textContent = 'מעלה קובץ ZIP לענן (עקיפת הגבלת נפח)...';
             
-            // Generate a unique path for the ZIP
-            const zipPath = `temp_uploads/${Date.now()}_${file.name}`;
+            // Sanitize filename for storage key (avoid Hebrew/spaces in S3 keys)
+            const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9_\-.]/g, '_');
+            const zipPath = `temp_uploads/${Date.now()}_${sanitizedFileName}`;
             
             // Upload directly to Supabase Storage from frontend
             const { data: uploadData, error: uploadError } = await supabaseClient
@@ -1267,10 +1268,10 @@ window.showSlidePreview = async (index, isFull = false) => {
                 </div>
                 
                 <!-- Feedback placeholder matching the real implementation -->
-                <div id="phishing-feedback-area" style="min-height: 5px; max-height: 22vh; overflow-y: auto; margin-bottom: 10px; flex-shrink: 0; padding-left: 5px;"></div>
+                <div id="phishing-feedback-area" style="max-height: 25vh; overflow-y: auto; margin-bottom: 10px; flex-shrink: 0;"></div>
                 
-                <div class="email-mockup" style="font-size: 0.85rem; max-height: 42vh; overflow-y: auto; color: #1e293b; background: #ffffff; flex-grow: 1; flex-shrink: 1;">
-                    <div class="email-os-header" style="padding: 8px 15px;">
+                <div class="email-mockup" style="font-size: 0.85rem; overflow-y: auto; color: #1e293b; background: #ffffff; flex: 1; min-height: 0; display: flex; flex-direction: column;">
+                    <div class="email-os-header" style="flex-shrink: 0; padding: 8px 15px;">
                         <div>דואר נכנס - Outlook</div>
                         <div class="email-os-controls">
                             <div class="os-min"></div>
@@ -1292,7 +1293,7 @@ window.showSlidePreview = async (index, isFull = false) => {
                         </button>
                     </div>
                     
-                    <div class="email-header" style="background: #ffffff; padding: 15px 20px;">
+                    <div class="email-header" style="flex-shrink: 0; background: #ffffff; padding: 15px 20px;">
                         <div class="email-header-row" style="margin-bottom: 8px;">
                             <div class="email-header-label" style="width: 50px;">מאת:</div>
                             <div class="sender-pill" style="padding: 2px 10px 2px 12px;">
@@ -1311,7 +1312,7 @@ window.showSlidePreview = async (index, isFull = false) => {
                             <div style="color: #9ca3af; font-size: 0.8rem;">היום, 09:14</div>
                         </div>
                     </div>
-                    <div class="email-body" style="padding: 12px 20px; line-height: 1.5; color: #334155; pointer-events: auto;">
+                    <div class="email-body" style="flex: 1; overflow-y: auto; padding: 12px 20px; line-height: 1.5; color: #334155; pointer-events: auto;">
                         <p style="margin-bottom: 12px; color: #334155;">שלום <span style="color:#ef4444; border-bottom:1px dashed #ef4444; padding: 2px 4px; border-radius: 4px;">לקוח יקר</span>,</p>
                         <p style="margin-bottom: 12px; color: #334155;">זיהינו פעילות חריגה בחשבון שלך ממכשיר לא מזוהה. מטעמי אבטחה, החשבון שלך הוגבל באופן זמני.</p>
                         <p style="margin-bottom: 18px; color: #334155;">אנא הקלק על הקישור הבא לאימות זהותך. יש לבצע את הפעולה תוך 24 שעות, אחרת חשבונך יינעל לצמיתות:</p>
@@ -1646,7 +1647,8 @@ audioUpload.onchange = async (e) => {
     showToast('מעלה קובץ...', 'info');
     
     try {
-        const filePath = `${currentCourse}/audio/${Date.now()}_${file.name}`;
+        const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9_\-.]/g, '_');
+        const filePath = `${currentCourse}/audio/${Date.now()}_${sanitizedFileName}`;
         const { data, error } = await supabaseClient.storage
             .from('course-assets')
             .upload(filePath, file);
@@ -1655,6 +1657,15 @@ audioUpload.onchange = async (e) => {
         
         audioPath.value = filePath;
         audioFilename.textContent = file.name;
+        
+        // Save immediately
+        if (selectedSlideIndex !== -1 && selectedSlideIndex !== -100) {
+            currentCourseData.screens[selectedSlideIndex].audio = filePath;
+        } else if (selectedSlideIndex === -100) {
+            currentCourseData.splash.audio = filePath;
+        }
+        await saveCourse();
+        
         showToast('הקובץ הועלה בהצלחה!');
     } catch (err) {
         console.error('[App] Audio upload failed:', err);
@@ -1674,7 +1685,8 @@ logoUpload.onchange = async (e) => {
     showToast('מעלה לוגו...', 'info');
     
     try {
-        const filePath = `${currentCourse}/logos/${Date.now()}_${file.name}`;
+        const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9_\-.]/g, '_');
+        const filePath = `${currentCourse}/logos/${Date.now()}_${sanitizedFileName}`;
         const { data, error } = await supabaseClient.storage
             .from('course-assets')
             .upload(filePath, file);
@@ -1684,6 +1696,13 @@ logoUpload.onchange = async (e) => {
         logoPath.value = filePath;
         logoFilename.textContent = file.name;
         updateLogoPreview();
+        
+        // Save immediately so Export gets the latest
+        if (selectedSlideIndex === -100) {
+            currentCourseData.splash.logo = filePath;
+        }
+        await saveCourse();
+        
         showToast('הלוגו הועלה בהצלחה!');
     } catch (err) {
         console.error('[App] Logo upload failed:', err);
@@ -1703,7 +1722,8 @@ bgUpload.onchange = async (e) => {
     showToast('מעלה תמונת רקע...', 'info');
     
     try {
-        const filePath = `${currentCourse}/assets/${Date.now()}_${file.name}`;
+        const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9_\-.]/g, '_');
+        const filePath = `${currentCourse}/assets/${Date.now()}_${sanitizedFileName}`;
         const { data, error } = await supabaseClient.storage
             .from('course-assets')
             .upload(filePath, file);
@@ -1712,12 +1732,16 @@ bgUpload.onchange = async (e) => {
         
         slideBg.value = filePath;
         bgFilename.textContent = file.name;
-        showToast('תמונת הרקע הועלתה בהצלחה!');
         
         // Auto-save the change to the current screen object
-        if (selectedSlideIndex !== -1) {
+        if (selectedSlideIndex === -100) {
+            currentCourseData.splash.bgImage = filePath;
+        } else if (selectedSlideIndex !== -1) {
             currentCourseData.screens[selectedSlideIndex].bgImage = filePath;
         }
+        await saveCourse();
+        
+        showToast('תמונת הרקע הועלתה בהצלחה!');
     } catch (err) {
         console.error('[App] Background upload failed:', err);
         showToast('שגיאה בהעלאת התמונה', 'error');

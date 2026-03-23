@@ -111,12 +111,14 @@
         }
         
         // Normal published mode OR system asset
-        // Since all export assets are flattened into 'assets/' during SCORM export,
-        // we extract just the filename to ensure it resolves correctly.
+        // If it's a known system asset, it lives in the 'assets/' folder.
+        // Otherwise, use the path as provided in data.json (which matches the ZIP structure).
         const filename = clean.split('/').pop();
-        clean = 'assets/' + filename;
+        if (systemAssets.includes(filename)) {
+            return 'assets/' + filename;
+        }
         
-        return clean;
+        return clean.replace(/\/+/g, '/');
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -593,10 +595,10 @@ window.finishPhishing = () => {
                         </div>
                         
                         <!-- Visual Feedback Area - compact and potentially absolute or semi-absolute -->
-                        <div id="phishing-feedback-area" style="min-height: 2px; max-height: 22vh; overflow-y: auto; margin-bottom: 8px; flex-shrink: 0; padding-left: 5px;"></div>
+                        <div id="phishing-feedback-area" style="max-height: 25vh; overflow-y: auto; margin-bottom: 8px; flex-shrink: 0;"></div>
                         
-                        <div class="email-mockup delay-3" style="font-size: 0.85rem; max-height: 42vh; overflow-y: auto; color: #1e293b; background: #ffffff; flex-grow: 1; flex-shrink: 1; border: 1px solid #d1d5db; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 10px;">
-                            <div class="email-os-header" style="padding: 8px 15px;">
+                        <div class="email-mockup delay-3" style="font-size: 0.85rem; overflow-y: auto; color: #1e293b; background: #ffffff; flex: 1; min-height: 0; border: 1px solid #d1d5db; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 10px; display: flex; flex-direction: column;">
+                            <div class="email-os-header" style="flex-shrink: 0; padding: 8px 15px;">
                                 <div>דואר נכנס - Outlook</div>
                                 <div class="email-os-controls">
                                     <div class="os-min"></div>
@@ -618,7 +620,7 @@ window.finishPhishing = () => {
                                 </button>
                             </div>
                             
-                            <div class="email-header" style="background: #ffffff; padding: 15px 20px;">
+                            <div class="email-header" style="flex-shrink: 0; background: #ffffff; padding: 15px 20px;">
                                 <div class="email-header-row" style="margin-bottom: 8px;">
                                     <div class="email-header-label" style="width: 50px;">מאת:</div>
                                     <div class="sender-pill" style="padding: 2px 10px 2px 12px;">

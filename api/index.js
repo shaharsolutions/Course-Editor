@@ -323,8 +323,6 @@ app.get('/api/course/:id/export', async (req, res) => {
             return res.status(404).send('Course not found');
         }
 
-        const { data: storageFiles } = await supabase.storage.from('course-assets').list(courseId, { recursive: true, limit: 1000 });
-
         const safeTitle = (course.title || 'course').replace(/[^a-zA-Z0-9א-ת\s\-_]/g, '_');
         const encodedTitle = encodeURIComponent(safeTitle);
         
@@ -346,10 +344,21 @@ app.get('/api/course/:id/export', async (req, res) => {
         const exportedFiles = [];
         const coreFiles = ['index.html', 'data.json', 'data.js', 'scorm_api.js', 'studio-player.js', 'studio-style.css', 'imsmanifest.xml'];
 
-        // 1. Storage Files Gathering (Using the flat recursive list from earlier)
-        const allPaths = (storageFiles || [])
-            .filter(item => item.id && item.name !== '.emptyFolderPlaceholder')
-            .map(item => item.name);
+        // 1. Storage Files Gathering (Extract paths directly from course.data)
+        const allPathsSet = new Set();
+        const extractPaths = (obj) => {
+            if (typeof obj === 'string') {
+                if (obj.startsWith(courseId + '/')) {
+                    allPathsSet.add(obj.substring(courseId.length + 1));
+                }
+            } else if (Array.isArray(obj)) {
+                obj.forEach(extractPaths);
+            } else if (obj && typeof obj === 'object') {
+                Object.values(obj).forEach(extractPaths);
+            }
+        };
+        extractPaths(course.data);
+        const allPaths = Array.from(allPathsSet);
         
         const exportLog = [];
         exportLog.push(`[Export Log] Course ID: ${courseId}`);
@@ -368,10 +377,9 @@ app.get('/api/course/:id/export', async (req, res) => {
                     return;
                 }
                 if (fileData) {
-                    // Flatten all uploaded assets into the 'assets/' directory in the ZIP 
-                    // to prevent path resolution issues with subdirectories like 'logos/'.
-                    const filename = filePath.split('/').pop();
-                    const zipPath = `assets/${filename}`;
+                    // Keep the original relative path (e.g. 'logos/logo.png') in the ZIP
+                    // this ensures importing the ZIP back to the editor works seamlessly.
+                    const zipPath = filePath;
                     archive.append(Buffer.from(await fileData.arrayBuffer()), { name: zipPath });
                     exportedFiles.push(zipPath);
                 }
