@@ -269,13 +269,16 @@ app.post('/api/courses/process-zip', async (req, res) => {
 // Course Data
 app.get('/api/course/:id', async (req, res) => {
     try {
-        const { data, error } = await supabase.from('courses').select('data').eq('id', req.params.id).single();
+        const { data, error } = await supabase.from('courses').select('data, title').eq('id', req.params.id).single();
         if (error) {
             console.error(`[Backend] Course fetch error (${req.params.id}):`, error.message);
             return res.status(500).json({ error: error.message });
         }
         if (!data) return res.status(404).json({ error: 'Course not found' });
-        res.json(data.data || { screens: [] });
+        
+        const courseData = data.data || { screens: [] };
+        courseData.name = data.title || courseData.name;
+        res.json(courseData);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -283,7 +286,11 @@ app.get('/api/course/:id', async (req, res) => {
 
 app.post('/api/course/:id', async (req, res) => {
     try {
-        const { error } = await supabase.from('courses').update({ data: req.body }).eq('id', req.params.id);
+        const updateData = { data: req.body };
+        if (req.body.name) {
+            updateData.title = req.body.name;
+        }
+        const { error } = await supabase.from('courses').update(updateData).eq('id', req.params.id);
         if (error) {
             console.error(`[Backend] Course update error (${req.params.id}):`, error.message);
             return res.status(500).json({ error: error.message });
@@ -306,49 +313,50 @@ app.delete('/api/course/:id', async (req, res) => {
 
 // Export SCORM (Dynamic Manifest)
 app.get('/api/course/:id/export', async (req, res) => {
+    console.log(`[Backend] Export requested for course: ${req.params.id}`);
     try {
         const courseId = req.params.id;
-        const { data: course } = await supabase.from('courses').select('title, data').eq('id', courseId).single();
+        const { data: course, error: fetchError } = await supabase.from('courses').select('title, data').eq('id', courseId).single();
+        
+        if (fetchError || !course) {
+            console.error(`[Backend] Export: Course not found or error:`, fetchError);
+            return res.status(404).send('Course not found');
+        }
+
         const { data: storageFiles } = await supabase.storage.from('course-assets').list(courseId, { recursive: true, limit: 1000 });
 
+        const safeTitle = (course.title || 'course').replace(/[^a-zA-Z0-9א-ת\s\-_]/g, '_');
+        const encodedTitle = encodeURIComponent(safeTitle);
+        
         res.setHeader('Content-Type', 'application/zip');
-        res.setHeader('Content-Disposition', `attachment; filename="${course.title || 'course'}.zip"`);
+        // Use RFC 6266 format for non-ASCII filenames (Hebrew support)
+        res.setHeader('Content-Disposition', `attachment; filename="${encodedTitle}.zip"; filename*=UTF-8''${encodedTitle}.zip`);
 
         const archive = archiver('zip', { zlib: { level: 9 } });
+        
+        // Handle archive errors
+        archive.on('error', (err) => {
+            console.error('[Backend] Archiver error:', err);
+            // We can't change status if headers sent, but we can end the response
+            if (!res.headersSent) res.status(500).send('Archiver failed');
+            else res.end();
+        });
+
         archive.pipe(res);
         const exportedFiles = [];
         const coreFiles = ['index.html', 'data.json', 'data.js', 'scorm_api.js', 'studio-player.js', 'studio-style.css', 'imsmanifest.xml'];
 
-        // 1. Storage Files Gathering
-        const allPaths = [];
-        const gatherFiles = async (dir = '') => {
-            const path = courseId + (dir ? '/' + dir : '');
-            const { data, error } = await supabase.storage.from('course-assets').list(path, { limit: 1000 });
-            if (error) {
-                console.error(`[Backend] Export error listing ${path}:`, error.message);
-                return;
-            }
-            if (!data) return;
-
-            for (const item of data) {
-                const rel = dir ? dir + '/' + item.name : item.name;
-                // In Supabase, directories have id: null (usually) or no metadata
-                if (item.id === null || (!item.metadata && !item.id)) {
-                    await gatherFiles(rel);
-                } else {
-                    allPaths.push(rel);
-                }
-            }
-        };
-
-        await gatherFiles();
+        // 1. Storage Files Gathering (Using the flat recursive list from earlier)
+        const allPaths = (storageFiles || [])
+            .filter(item => item.id && item.name !== '.emptyFolderPlaceholder')
+            .map(item => item.name);
         
         const exportLog = [];
         exportLog.push(`[Export Log] Course ID: ${courseId}`);
         exportLog.push(`[Export Log] Found ${allPaths.length} items in storage.`);
 
         const downloadFile = async (filePath) => {
-            if (!filePath || filePath.endsWith('/') || filePath.split('/').pop() === '.emptyFolderPlaceholder') return;
+            if (!filePath || filePath.endsWith('/')) return;
             // Skip core files
             if (coreFiles.includes(filePath.split('/').pop())) return;
 
@@ -360,8 +368,12 @@ app.get('/api/course/:id/export', async (req, res) => {
                     return;
                 }
                 if (fileData) {
-                    archive.append(Buffer.from(await fileData.arrayBuffer()), { name: filePath });
-                    exportedFiles.push(filePath);
+                    // Flatten all uploaded assets into the 'assets/' directory in the ZIP 
+                    // to prevent path resolution issues with subdirectories like 'logos/'.
+                    const filename = filePath.split('/').pop();
+                    const zipPath = `assets/${filename}`;
+                    archive.append(Buffer.from(await fileData.arrayBuffer()), { name: zipPath });
+                    exportedFiles.push(zipPath);
                 }
             } catch (err) {
                 exportLog.push(`[ERROR] Error ${filePath}: ${err.message}`);

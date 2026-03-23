@@ -78,6 +78,19 @@ body::after {
     text-align: center !important;
 }
 
+#content-area.phishing-mode {
+    width: 52% !important;
+    max-width: 680px !important;
+    padding: 12px !important;
+    border-radius: 14px !important;
+    background: rgba(15, 23, 42, 0.98) !important;
+    margin-top: -7px !important;
+    max-height: 78vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+
 .logo-placeholder {
     width: 120px;
     height: 120px;
@@ -125,6 +138,7 @@ body::after {
     transform: translateY(-50%);
     width: 42%;
     max-width: 600px;
+    max-height: 80vh;
     background: rgba(15, 23, 42, 0.9);
     border: 1px solid var(--border);
     border-radius: 20px;
@@ -134,6 +148,7 @@ body::after {
     text-align: right;
     direction: rtl;
     overflow-y: auto;
+    overflow-x: hidden;
     box-shadow: 0 10px 40px rgba(0,0,0,0.5);
     transition: all 0.3s ease;
 }
@@ -424,16 +439,16 @@ p { color: var(--text-main); line-height: 1.7; font-size: 1.15rem; }
     100% { opacity: 1; } 
 }
 @keyframes animSlideRight { 
-    0% { opacity: 0; transform: translateX(50px); } 
+    0% { opacity: 0; transform: translateX(30px); } 
     100% { opacity: 1; transform: translateX(0); } 
 }
 @keyframes animPop { 
-    0% { opacity: 0; transform: scale(0.5); } 
+    0% { opacity: 0; transform: scale(0.8); } 
     100% { opacity: 1; transform: scale(1); } 
 }
 @keyframes animBounce {
-    0% { opacity: 0; transform: translateY(100px); }
-    60% { transform: translateY(-15px); }
+    0% { opacity: 0; transform: translateY(40px); }
+    60% { transform: translateY(-10px); }
     80% { transform: translateY(5px); }
     100% { opacity: 1; transform: translateY(0); }
 }
@@ -611,6 +626,10 @@ p { color: var(--text-main); line-height: 1.7; font-size: 1.15rem; }
     background: rgba(245, 158, 11, 0.05);
 }
 .alert-box.warning i, .alert-box.warning h4 { color: #fbbf24; }
+.waiting-for-typing {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
 /* Phishing Simulator */
 .phishing-container {
     margin-top: 15px;
@@ -621,12 +640,17 @@ p { color: var(--text-main); line-height: 1.7; font-size: 1.15rem; }
     color: #1f2937;
     border-radius: 10px;
     padding: 0;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+    max-height: 45vh; /* Fixed: Constrain height to prevent overflow */
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     direction: rtl;
     text-align: right;
     border: 1px solid #d1d5db;
     font-family: inherit;
+    flex-shrink: 1; /* Allow it to shrink if needed */
 }
 
 .email-os-header {
@@ -797,4 +821,13 @@ p { color: var(--text-main); line-height: 1.7; font-size: 1.15rem; }
 .btn-report:hover {
     background: #dc2626;
     transform: translateY(-2px);
+}
+
+@keyframes bounceY {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(5px); }
+}
+@keyframes bounceYRev {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
 }

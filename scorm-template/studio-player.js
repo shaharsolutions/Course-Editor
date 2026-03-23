@@ -22,7 +22,7 @@
     }
 
     let typeTimer = null;
-    function typeEffect(element, text, speed = 20) {
+    function typeEffect(element, text, speed = 20, onComplete = null) {
         if (typeTimer) clearInterval(typeTimer);
         element.innerHTML = '';
         let i = 0;
@@ -36,6 +36,7 @@
             } else {
                 clearInterval(typeTimer);
                 typeTimer = null;
+                if (onComplete) onComplete();
             }
         }, speed);
     }
@@ -66,6 +67,13 @@
 
     window.addEventListener('resize', fitPlayer);
     window.addEventListener('orientationchange', () => setTimeout(fitPlayer, 200));
+
+    // Ensure SCORM session is finished on close/refresh
+    window.addEventListener('beforeunload', () => {
+        if (window.SCORM && SCORM.connected) {
+            SCORM.finish();
+        }
+    });
 
     function hexToRgba(hex, alpha = 1) {
         if (!hex || !hex.startsWith('#')) return `rgba(56, 189, 248, ${alpha})`;
@@ -103,11 +111,12 @@
         }
         
         // Normal published mode OR system asset
-        if (!clean.includes('/')) {
-            clean = 'assets/' + clean;
-        }
+        // Since all export assets are flattened into 'assets/' during SCORM export,
+        // we extract just the filename to ensure it resolves correctly.
+        const filename = clean.split('/').pop();
+        clean = 'assets/' + filename;
         
-        return clean.replace(/\/+/g, '/');
+        return clean;
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -121,7 +130,7 @@
         contentArea.innerHTML = `
             <div style="text-align:center; padding:50px;" class="animate-in">
                 <div class="loader-pulse" style="margin: 0 auto;"></div>
-                <p style="margin-top:20px; color:#94a3b8;" class="cyber-glitch">מכין את מרחב הלמידה...</p>
+                <p style="margin-top:20px; color:#94a3b8;" class="cyber-glitch">מסדרים לך את מרחב הלמידה...</p>
             </div>`;
 
         // SCORM Init
@@ -153,9 +162,9 @@ window.handleFlagClick = (el, id) => {
     el.classList.add('found');
     
     const msgs = {
-        'sender': '<strong>זיהוי מעולה של כתובת מזויפת!</strong><br>שימו לב לכתובת המייל (paypa1 במקום paypal). נוכלים מרבים להשתמש באותיות דומות או החלפת L ב-1 כדי להטעות את העין במבט ראשון.',
-        'greeting': '<strong>פנייה כללית מחשידה!</strong><br>אימייל לגיטימי ורשמי ממוסד המכיר אתכם תמיד יפנה אליכם בשמכם הפרטי או המלא, ולא בכינוי גנרי כמו "לקוח יקר".',
-        'link': '<strong>זהירות מלינקים במסווה!</strong><br>הכפתור מעוצב כמו מערכת רשמית אך תמיד יש לרחף עם העכבר כדי לראות את כתובת ה-URL השלמה ולוודא שהיא לא הונאה.'
+        'sender': '<strong>שיחקת אותה! זיהית שכתובת השולח מזויפת.</strong><br>שימו לב לכתובת המייל (paypa1 במקום paypal). נוכלים משתמשים המון באותיות דומות כדי לעבוד עלינו במבט ראשון.',
+        'greeting': '<strong>חשד בריא! פנייה כללית היא נורת אזהרה קלאסית.</strong><br>גופים רשמיים שמכירים אתכם תמיד יפנו אליכם בשמכם המלא, ולא בכינוי גנרי כמו "לקוח יקר".',
+        'link': '<strong>בול! הכפתור הזה הוא מלכודת.</strong><br>הוא נראה רשמי, אבל תמיד כדאי לרחף עם העכבר מעל לינקים כדי לראות לאן הם באמת מובילים.'
     };
     
     const feedbackArea = document.getElementById('phishing-feedback-area');
@@ -165,9 +174,9 @@ window.handleFlagClick = (el, id) => {
         feedbackArea.classList.add('animate-in');
         
         feedbackArea.innerHTML = `
-            <div style="background: rgba(254,242,242,0.9); border-right: 4px solid #ef4444; padding: 10px 15px; border-radius: 8px; color: #1e293b; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 5px;">
-                <i class="fas fa-exclamation-triangle" style="color: #ef4444; float: right; margin-left: 12px; font-size: 1.2rem; margin-top: 2px;"></i>
-                <div style="margin-right: 30px; line-height: 1.4; font-size: 0.9rem;">${msgs[id] || 'זיהית סימן מחשיד'}</div>
+            <div style="background: rgba(254,242,242,0.95); border-right: 4px solid #ef4444; padding: 8px 12px; border-radius: 8px; color: #1e293b; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 5px;">
+                <i class="fas fa-exclamation-triangle" style="color: #ef4444; float: right; margin-left: 10px; font-size: 1rem; margin-top: 2px;"></i>
+                <div style="margin-right: 25px; line-height: 1.3; font-size: 0.85rem;">${msgs[id] || 'זיהית סימן מחשיד'}</div>
             </div>
         `;
     }
@@ -181,6 +190,20 @@ window.updatePhishingCounter = (lastFeedbackHtml) => {
         counter.innerHTML = `<span style="font-size: 1.5rem; color: #ef4444; margin-left: 5px;">${window.foundFlags.size}</span> מתוך ${window.totalFlags}`;
     }
     
+    const feedbackArea = document.getElementById('phishing-feedback-area');
+    if (!feedbackArea) return;
+
+    // Hint Logic
+    let clueHtml = '';
+    if (window.foundFlags.size === 2 && window.foundFlags.has('sender') && window.foundFlags.has('greeting')) {
+        clueHtml = `
+            <div class="animate-in" style="background: rgba(56,189,248,0.15); border-right: 4px solid #38bdf8; padding: 8px 12px; border-radius: 8px; color: #0369a1; margin-top: 8px; font-size: 0.9rem; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-arrow-down-long" style="color: #38bdf8; font-size: 1.2rem; animation: bounceY 1s infinite;"></i>
+                <span>נראה שיש פה עוד משהו... <strong>בואו נגלול קצת מטה</strong> להמשך המייל.</span>
+            </div>
+        `;
+    }
+
     // Unlock if all found
     const reportBtn = document.getElementById('report-simulation-btn');
     if (window.foundFlags.size >= window.totalFlags) {
@@ -194,9 +217,7 @@ window.updatePhishingCounter = (lastFeedbackHtml) => {
             reportBtn.innerHTML = '<i class="fas fa-shield-alt" style="margin-left: 6px;"></i> דווח למערכת';
         }
         
-        const feedbackArea = document.getElementById('phishing-feedback-area');
-        if (feedbackArea && lastFeedbackHtml) {
-            // Displays both the specific feedback AND the success message
+        if (lastFeedbackHtml) {
             feedbackArea.innerHTML = `
                 <div class="animate-in" style="background: rgba(254,242,242,0.9); border-right: 4px solid #ef4444; padding: 8px 12px; border-radius: 8px; color: #1e293b; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 8px;">
                     <i class="fas fa-exclamation-triangle" style="color: #ef4444; float: right; margin-left: 12px; font-size: 1.1rem; margin-top: 2px;"></i>
@@ -204,15 +225,22 @@ window.updatePhishingCounter = (lastFeedbackHtml) => {
                 </div>
                 <div class="animate-in delay-1" style="background: rgba(34,197,94,0.15); border-right: 4px solid #22c55e; padding: 8px 12px; border-radius: 8px; color: #166534; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px dashed #22c55e;">
                     <i class="fas fa-check-circle" style="color: #22c55e; float: right; margin-left: 12px; font-size: 1.1rem; margin-top: 2px;"></i>
-                    <div style="margin-right: 30px; line-height: 1.4; font-size: 0.9rem;"><strong>כל הכבוד!</strong> מצאת את הכל. כעת <strong>דווח למערכת</strong> להשלמת המשימה.</div>
+                    <div style="margin-right: 30px; line-height: 1.4; font-size: 0.9rem;"><strong>כל הכבוד!</strong> מצאת את הכל.</div>
+                </div>
+                <div class="animate-in delay-2" style="background: rgba(34,197,94,0.1); border-right: 4px solid #22c55e; padding: 8px 12px; border-radius: 8px; color: #166534; margin-top: 8px; font-size: 0.95rem; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-arrow-up-long" style="color: #22c55e; font-size: 1.2rem; animation: bounceYRev 1s infinite;"></i>
+                    <span>עכשיו רק נשאר <strong>לגלול חזרה למעלה</strong> ולדווח.</span>
                 </div>
             `;
         }
+    } else if (clueHtml) {
+        // Just add the clue if we have it and haven't finished
+        feedbackArea.innerHTML += clueHtml;
     }
 };
 
 window.finishPhishing = () => {
-    showToast("סימולציה הושלמה", "זיהית בהצלחה את כל סימני האזהרה באימייל! זכור: תמיד בדוק את זהות השולח ואת הלינקים לפני הלחיצה.", () => {
+    showToast("כל הכבוד!", "זיהית בהצלחה את כל סימני האזהרה במייל! זכרו: תמיד כדאי לוודא מי השולח ולאן הלינקים מובילים לפני שלוחצים.", () => {
         nextSlide();
     });
 };
@@ -361,7 +389,7 @@ window.finishPhishing = () => {
                 audio.load(); // Explicitly trigger load
             });
 
-            updateStatus('טוען גרפיקה וסאונד...');
+            updateStatus('נערכים עם הגרפיקה והסאונד...');
             
             screens.forEach(s => {
                 if (s.bgImage) assets.push(loadImg(resolveAssetPath(s.bgImage)));
@@ -380,10 +408,10 @@ window.finishPhishing = () => {
                 } catch (e) {
                     console.warn('[StudioPlayer] Batch load error:', e);
                 }
-                updateStatus(`טוען משאבי לומדה (${Math.round((Math.min(i + batchSize, total) / total) * 100)}%)...`);
+                updateStatus(`מסדרים את כל הדברים היפים (${Math.round((Math.min(i + batchSize, total) / total) * 100)}%)...`);
             }
             
-            updateStatus('הטעינה הושלמה!');
+            updateStatus('אנחנו מוכנים!');
             await new Promise(r => setTimeout(r, 500));
         }
 
@@ -400,8 +428,12 @@ window.finishPhishing = () => {
             
             if (!screen) return;
             
-            // Remove splash-mode by default
+            // Remove special modes by default
             contentArea.classList.remove('splash-mode');
+            contentArea.classList.remove('phishing-mode');
+            if (screen.type === 'phishing-test') {
+                contentArea.classList.add('phishing-mode');
+            }
             
             // Apply per-slide transparency
             const transparency = (screen.styles && screen.styles.transparency !== undefined) ? screen.styles.transparency : 90;
@@ -552,7 +584,7 @@ window.finishPhishing = () => {
                 window.foundFlags = new Set();
                 window.totalFlags = 3;
                 html += `
-                    <div class="phishing-container animate-in delay-2" style="text-align: right; direction: rtl; max-width: 800px; margin: 0 auto; display: flex; flex-direction: column;">
+                    <div class="phishing-container animate-in delay-2" style="text-align: right; direction: rtl; width: 100%; margin: 0 auto; display: flex; flex-direction: column; height: 100%; flex: 1; min-height: 0; overflow: hidden;">
                         <div style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px;">
                             <p style="margin: 0; font-size: 1.15rem; font-weight: 600; color: #e2e8f0; line-height: 1.4;">${screen.content || 'זהה את כל נורות האזהרה באימייל הבא:'}</p>
                             <div class="phishing-counter" style="align-self: flex-start; margin: 0; padding: 6px 16px; background: rgba(56, 189, 248, 0.1); border: 1px solid #38bdf8; border-radius: 20px; color: #38bdf8; font-size: 0.95rem; white-space: nowrap;">
@@ -561,9 +593,9 @@ window.finishPhishing = () => {
                         </div>
                         
                         <!-- Visual Feedback Area - compact and potentially absolute or semi-absolute -->
-                        <div id="phishing-feedback-area" style="min-height: 5px; margin-bottom: 10px; flex-shrink: 0;"></div>
+                        <div id="phishing-feedback-area" style="min-height: 2px; max-height: 22vh; overflow-y: auto; margin-bottom: 8px; flex-shrink: 0; padding-left: 5px;"></div>
                         
-                        <div class="email-mockup delay-3" style="font-size: 0.85rem; max-height: 48vh; overflow-y: auto; color: #1e293b; background: #ffffff; flex-grow: 1;">
+                        <div class="email-mockup delay-3" style="font-size: 0.85rem; max-height: 42vh; overflow-y: auto; color: #1e293b; background: #ffffff; flex-grow: 1; flex-shrink: 1; border: 1px solid #d1d5db; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 10px;">
                             <div class="email-os-header" style="padding: 8px 15px;">
                                 <div>דואר נכנס - Outlook</div>
                                 <div class="email-os-controls">
@@ -615,7 +647,7 @@ window.finishPhishing = () => {
                                 </div>
                                 
                                 <p style="margin-bottom: 3px; color: #334155;">בברכה,</p>
-                                <p style="color: #6b7280; font-size: 0.85rem; margin-bottom: 0;">צוות התמיכה והאבטחה - מאובטח</p>
+                                <p style="color: #6b7280; font-size: 0.85rem; margin-bottom: 0;">צוות התמיכה והאבטחה</p>
                             </div>
                         </div>
                     </div>
@@ -628,10 +660,13 @@ window.finishPhishing = () => {
                 if (screen.alerts) {
                     html += `<div class="alerts-container">
                         ${(screen.alerts || []).map((alert, i) => {
+                            const isWaiting = alert.waitForTyping;
                             const animClass = alert.animation ? `anim-${alert.animation}` : `animate-in delay-${Math.min(i+2, 4)}`;
+                            const classes = `alert-box ${alert.type || 'info'} ${isWaiting ? 'waiting-for-typing' : animClass}`;
+                            const dataAnim = isWaiting ? `data-anim="${animClass}"` : '';
                             const customDelay = alert.delay !== undefined ? `animation-delay: ${alert.delay}s;` : '';
                             return `
-                                <div class="alert-box ${alert.type || 'info'} ${animClass}" style="${customDelay}">
+                                <div class="${classes}" ${dataAnim} style="${customDelay}">
                                     <i class="${alert.icon || 'fas fa-info-circle'}"></i>
                                     <div class="alert-content">
                                         <h4>${alert.title || ''}</h4>
@@ -681,7 +716,24 @@ window.finishPhishing = () => {
             if (typingEl && screen.content) {
                 // If it was already visited, maybe skip typing? 
                 // For now, always type for engagement.
-                typeEffect(typingEl, screen.content);
+                typeEffect(typingEl, screen.content, 20, () => {
+                    document.querySelectorAll('.waiting-for-typing').forEach(el => {
+                        el.classList.remove('waiting-for-typing');
+                        if (el.dataset.anim) {
+                            const anims = el.dataset.anim.split(' ');
+                            anims.forEach(cls => el.classList.add(cls));
+                        }
+                    });
+                });
+            } else {
+                // If there's no content to type, but alerts are waiting, trigger them immediately
+                document.querySelectorAll('.waiting-for-typing').forEach(el => {
+                    el.classList.remove('waiting-for-typing');
+                    if (el.dataset.anim) {
+                        const anims = el.dataset.anim.split(' ');
+                        anims.forEach(cls => el.classList.add(cls));
+                    }
+                });
             }
 
             // Attach listeners to options
@@ -769,7 +821,7 @@ window.finishPhishing = () => {
             // Return feedback toast if already submitted
             if (isSubmitted && screen.question) {
                 setTimeout(() => {
-                    const status = `<span class="feedback-status info">כבר ענית על שאלה זו</span>`;
+                    const status = `<span class="feedback-status info">כבר היינו בשאלה הזו</span>`;
                     const feedback = screen.question.feedback || "התשובה הנכונה מסומנת בירוק.";
                     const selOpt = screen.question.options[selectedIndex];
                     const selText = selOpt ? selOpt.text : "";
@@ -837,7 +889,7 @@ window.finishPhishing = () => {
                     ${selectedAnswer ? `
                         <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1);">
                             <span style="color: var(--primary); font-weight: 700; font-size: 0.9rem; display: block; margin-bottom: 5px;">התשובה שבחרת:</span>
-                            <p style="font-weight: 700; font-size: 1.1rem; color: #fff; margin: 0;">${selectedAnswer}</p>
+                            <p style="font-weight: 400; font-size: 1.1rem; color: #fff; margin: 0;">${selectedAnswer}</p>
                         </div>
                     ` : ''}
                 </div>
@@ -874,7 +926,6 @@ window.finishPhishing = () => {
             if (!screens[currentIndex] || !window.SCORM || !SCORM.connected) return;
             const state = { index: currentIndex, score, answered: answeredCount, timers: slideTimers, questions: questionStates };
             SCORM.saveProgressState(screens[currentIndex].id || `s${currentIndex}`, state);
-            SCORM.set("cmi.core.progress_measure", ((currentIndex + 1) / screens.length).toFixed(2));
         }
 
         function restoreState() {

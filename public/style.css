@@ -845,12 +845,32 @@ input:checked + .slider:before {
 
 .content-area-mockup {
     position: absolute; top: 50%; left: 5%; transform: translateY(-50%);
-    width: 42%; max-width: 550px; max-height: 75%;
+    width: 42%; max-width: 550px; max-height: 80vh;
     background: rgba(15, 23, 42, 0.95); border: 1px solid var(--border);
     border-radius: 20px; padding: 35px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     z-index: 200; display: flex; flex-direction: column; text-align: right;
     direction: rtl; overflow-y: auto; backdrop-filter: blur(10px);
 }
+
+.content-area-mockup.phishing-mode {
+    width: 52% !important;
+    max-width: 680px !important;
+    padding: 12px !important;
+    border-radius: 14px !important;
+    background: rgba(15, 23, 42, 0.98) !important;
+    margin-top: -7px !important;
+    max-height: 78vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+
+.content-area-mockup.phishing-mode h1 {
+    font-size: 1.5rem;
+    margin-bottom: 12px;
+}
+
+
 
 .content-area-mockup h1 { font-size: 1.8rem; color: var(--primary); margin-bottom: 20px; font-weight: 800; }
 .question-text { font-size: 1.05rem; color: var(--text-main); margin-bottom: 24px; }
@@ -1135,12 +1155,17 @@ input:checked + .slider:before {
     color: #1f2937;
     border-radius: 10px;
     padding: 0;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100%;
+    max-height: 45vh; /* Fixed: Constrain height */
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     direction: rtl;
     text-align: right;
     border: 1px solid #d1d5db;
     font-family: inherit;
+    flex-shrink: 1;
 }
 
 .email-os-header {

@@ -1,9 +1,7 @@
 console.log('[App] Version: 2.2 - Fix 500/413 Upload Errors');
 
 // --- Configuration ---
-const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
-    ? `http://${window.location.hostname}:3030/api` 
-    : '/api';
+const API_BASE = '/api';
 const SUPABASE_URL = 'https://iduyexkzivtnvrdsbwig.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkdXlleGt6aXZ0bnZyZHNid2lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0NjYwMTYsImV4cCI6MjA4OTA0MjAxNn0.MhqZwvY7RiOBBqgBhRD-e-SqbI7NIf2vWxNuD5_6e48';
 const baseUrl = '/';
@@ -35,6 +33,9 @@ const bulkMinDelay = document.getElementById('bulk-min-delay');
 const applyBulkDelayBtn = document.getElementById('apply-bulk-delay');
 const bulkWaitAudio = document.getElementById('bulk-wait-audio');
 const applyBulkAudioLockBtn = document.getElementById('apply-bulk-audio-lock');
+const bulkTransparency = document.getElementById('bulk-transparency');
+const bulkTransparencyVal = document.getElementById('bulk-transparency-val');
+const applyBulkTransparencyBtn = document.getElementById('apply-bulk-transparency');
 const selectedCount = document.getElementById('selected-count');
 const slideTitle = document.getElementById('slide-title');
 const slideContent = document.getElementById('slide-content');
@@ -75,6 +76,10 @@ const logoSize = document.getElementById('logo-size');
 const logoSizeVal = document.getElementById('logo-size-val');
 const logoBgTransparency = document.getElementById('logo-bg-transparency');
 const logoBgTransparencyVal = document.getElementById('logo-bg-transparency-val');
+
+// Course Name
+const courseNameGroup = document.getElementById('course-name-field-group');
+const courseNameInput = document.getElementById('course-name-input');
 
 // Officer
 const officerCard = document.getElementById('officer-details-card');
@@ -543,6 +548,37 @@ applyBulkAudioLockBtn.onclick = async () => {
     await saveCourse();
 };
 
+if (bulkTransparency) {
+    bulkTransparency.oninput = (e) => {
+        bulkTransparencyVal.textContent = `${e.target.value}%`;
+    };
+}
+
+applyBulkTransparencyBtn.onclick = async () => {
+    const val = parseInt(bulkTransparency.value);
+    if (selectedSlidesIndices.size === 0) return;
+    
+    // Ensure data from form is captured first
+    updateCurrentSlideData();
+
+    selectedSlidesIndices.forEach(index => {
+        if (currentCourseData.screens[index]) {
+            currentCourseData.screens[index].styles = currentCourseData.screens[index].styles || {};
+            currentCourseData.screens[index].styles.transparency = val;
+        }
+    });
+
+    showToast(`שקיפות תיבת הטקסט עודכנה ל-${val}% עבור ${selectedSlidesIndices.size} שקפים`);
+
+    if (selectedSlidesIndices.has(selectedSlideIndex)) {
+        slideTransparency.value = val;
+        slideTransparencyVal.textContent = `${val}%`;
+    }
+
+    renderSlidesList(currentCourseData.screens);
+    await saveCourse();
+};
+
 async function deleteSlide(index) {
     const confirmed = await showConfirm(
         'מחיקת שקף',
@@ -628,6 +664,7 @@ function selectSlide(index) {
     // Restore fields
     basicSlideFields.classList.remove('hidden');
     logoFieldGroup.classList.add('hidden');
+    if (courseNameGroup) courseNameGroup.classList.add('hidden');
     
     // De-select splash item
     splashItem.classList.remove('active');
@@ -685,6 +722,10 @@ function selectSplash() {
     
     // Show splash-specific fields
     logoFieldGroup.classList.remove('hidden');
+    if (courseNameGroup) {
+        courseNameGroup.classList.remove('hidden');
+        courseNameInput.value = currentCourseData.name || '';
+    }
     logoPath.value = splash.logo || '';
     logoFilename.textContent = splash.logo ? splash.logo.split('/').pop() : 'לא נבחר לוגו';
     logoBgColor.value = splash.logoBgColor || '#38bdf8';
@@ -792,6 +833,10 @@ function renderAlerts(alerts = []) {
                     </select>
                 </div>
             </div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.05);">
+                <input type="checkbox" id="alert-wait-typing-${idx}" ${alert.waitForTyping ? 'checked' : ''} onchange="currentCourseData.screens[selectedSlideIndex].alerts[${idx}].waitForTyping = this.checked">
+                <label for="alert-wait-typing-${idx}" style="font-size: 0.8rem; color: #e2e8f0; cursor: pointer;">הצג רק בסיום הכתיבה</label>
+            </div>
         `;
         alertsContainer.appendChild(div);
     });
@@ -856,6 +901,10 @@ function updateCurrentSlideData() {
         splash.logoBgTransparency = parseInt(logoBgTransparency.value);
         splash.styles = splash.styles || {};
         splash.styles.transparency = parseInt(slideTransparency.value);
+        
+        if (courseNameInput) {
+            currentCourseData.name = courseNameInput.value;
+        }
         return;
     }
 
@@ -956,6 +1005,12 @@ async function saveCourse() {
         
         if (response.ok) {
             showToast('השינויים נשמרו בהצלחה!');
+            updateBreadcrumb();
+            // Refresh selector text
+            if (courseSelector && currentCourse) {
+                const opt = Array.from(courseSelector.options).find(o => o.value === currentCourse);
+                if (opt) opt.textContent = currentCourseData.name;
+            }
         } else {
             showToast('שגיאה בשמירת הנתונים', 'error');
         }
@@ -984,7 +1039,16 @@ document.getElementById('export-btn').onclick = function() {
         btn.innerHTML = originalContent;
     }, 5000);
 
-    window.location.href = `${API_BASE}/course/${currentCourse}/export`;
+    // Use a hidden anchor to trigger download instead of window.location.href 
+    // to bypass certain origin/frame security blocks in some browsers.
+    const downloadUrl = `${API_BASE}/course/${currentCourse}/export`;
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    // Don't set 'download' attribute here as the server sends it via headers 
+    // and setting it on cross-origin might be ignored anyway.
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 };
 
 // --- Assets Helper ---
@@ -1194,7 +1258,7 @@ window.showSlidePreview = async (index, isFull = false) => {
     } else if (screen.type === 'phishing-test') {
         const totalFlagsMock = 3;
         contentHtml = `
-            <div class="screen active" style="text-align: right; direction: rtl; display: flex; flex-direction: column;">
+            <div class="screen active" style="text-align: right; direction: rtl; display: flex; flex-direction: column; height: 100%; flex: 1; min-height: 0; overflow: hidden;">
                 <div style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px;">
                     <p style="margin: 0; font-size: 1.15rem; font-weight: 600; color: #e2e8f0; line-height: 1.4;">${content}</p>
                     <div class="phishing-counter" style="align-self: flex-start; margin: 0; padding: 6px 16px; background: rgba(56, 189, 248, 0.1); border: 1px solid #38bdf8; border-radius: 20px; color: #38bdf8; font-size: 0.95rem; white-space: nowrap;">
@@ -1203,9 +1267,9 @@ window.showSlidePreview = async (index, isFull = false) => {
                 </div>
                 
                 <!-- Feedback placeholder matching the real implementation -->
-                <div id="phishing-feedback-area" style="min-height: 5px; margin-bottom: 10px; flex-shrink: 0;"></div>
+                <div id="phishing-feedback-area" style="min-height: 5px; max-height: 22vh; overflow-y: auto; margin-bottom: 10px; flex-shrink: 0; padding-left: 5px;"></div>
                 
-                <div class="email-mockup" style="font-size: 0.85rem; max-height: 48vh; overflow-y: auto; color: #1e293b; background: #ffffff; flex-grow: 1;">
+                <div class="email-mockup" style="font-size: 0.85rem; max-height: 42vh; overflow-y: auto; color: #1e293b; background: #ffffff; flex-grow: 1; flex-shrink: 1;">
                     <div class="email-os-header" style="padding: 8px 15px;">
                         <div>דואר נכנס - Outlook</div>
                         <div class="email-os-controls">
@@ -1257,7 +1321,7 @@ window.showSlidePreview = async (index, isFull = false) => {
                         </div>
                         
                         <p style="margin-bottom: 3px; color: #334155;">בברכה,</p>
-                        <p style="color: #6b7280; font-size: 0.85rem; margin-bottom: 0;">צוות התמיכה והאבטחה - מאובטח</p>
+                        <p style="color: #6b7280; font-size: 0.85rem; margin-bottom: 0;">צוות התמיכה והאבטחה</p>
                     </div>
                 </div>
             </div>
@@ -1300,7 +1364,7 @@ window.showSlidePreview = async (index, isFull = false) => {
                 <div class="mockup-label">${charLabel}</div>
             </div>
 
-            <div class="content-area-mockup ${isQ ? 'question-mode' : ''} ${isSplash ? 'splash-mode' : ''}" 
+            <div class="content-area-mockup ${isQ ? 'question-mode' : ''} ${isSplash ? 'splash-mode' : ''} ${screen.type === 'phishing-test' ? 'phishing-mode' : ''}" 
                  style="background: rgba(15, 23, 42, ${transparencyVal / 100}) !important; ${isSplash ? 'width: 75% !important; max-width: 900px !important; left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; text-align: center !important;' : ''}">
                 ${contentHtml}
             </div>

@@ -51,14 +51,23 @@
                     </div>
                 </div>
 
-                <div class="form-group inline-group" style="margin-bottom: 5px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;">
+                <div class="form-group inline-group" style="margin-bottom: 15px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;">
                     <label class="switch">
                         <input type="checkbox" id="bulk-wait-audio">
                         <span class="slider round"></span>
                     </label>
-                    <div style="display: flex; flex-direction: column; margin-right: 10px;">
+                    <div style="display: flex; flex-direction: column; margin-right: 10px; flex-grow: 1;">
                         <span style="font-size: 0.85rem; font-weight: 600;">עצירת התקדמות עד סיום קריינות</span>
                         <button id="apply-bulk-audio-lock" class="text-btn" style="font-size: 0.7rem; color: var(--primary); background: none; border: none; padding: 0; text-align: right; cursor: pointer; text-decoration: underline; margin-top: 4px;">החל על הנבחרים</button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 5px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;">
+                    <label style="font-size: 0.75rem; font-weight: 600; display: block; margin-bottom: 8px;">שקיפות תיבת הטקסט (%)</label>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <input type="range" id="bulk-transparency" min="0" max="100" value="90" style="flex-grow: 1; height: 6px; cursor: pointer;">
+                        <span id="bulk-transparency-val" style="font-size: 0.8rem; min-width: 35px; color: var(--primary); font-weight: 700;">90%</span>
+                        <button id="apply-bulk-transparency" class="primary-btn small-btn" style="padding: 6px 12px; font-size: 0.75rem;">החל</button>
                     </div>
                 </div>
             </div>
@@ -138,6 +147,11 @@
                                 <span id="slide-transparency-val" style="font-size: 0.85rem; color: var(--primary);">90%</span>
                             </label>
                             <input type="range" id="slide-transparency" min="0" max="100" value="90" style="width: 100%; cursor: pointer;">
+                        </div>
+
+                        <div class="form-group hidden" id="course-name-field-group">
+                            <label><i class="fas fa-edit"></i> שם הלומדה (מוצג ברשימה)</label>
+                            <input type="text" id="course-name-input" placeholder="הכנס את שם הלומדה...">
                         </div>
 
                         <div class="form-group" id="logo-field-group">
