@@ -56,6 +56,11 @@ const uploadCourseBtn = document.getElementById('upload-course-btn');
 const deleteCourseBtn = document.getElementById('delete-course-btn');
 const courseFileInput = document.getElementById('course-file-input');
 
+const splashItem = document.getElementById('splash-item');
+const basicSlideFields = document.getElementById('basic-slide-fields');
+const slideTransparency = document.getElementById('slide-transparency');
+const slideTransparencyVal = document.getElementById('slide-transparency-val');
+
 // Logo
 const logoFieldGroup = document.getElementById('logo-field-group');
 const logoUpload = document.getElementById('logo-upload');
@@ -66,6 +71,10 @@ const logoBgColorHex = document.getElementById('logo-bg-color-hex');
 const logoPreviewCircle = document.getElementById('logo-preview-circle');
 const logoPreviewImg = document.getElementById('logo-preview-img');
 const logoPreviewPlaceholder = document.getElementById('logo-preview-placeholder');
+const logoSize = document.getElementById('logo-size');
+const logoSizeVal = document.getElementById('logo-size-val');
+const logoBgTransparency = document.getElementById('logo-bg-transparency');
+const logoBgTransparencyVal = document.getElementById('logo-bg-transparency-val');
 
 // Officer
 const officerCard = document.getElementById('officer-details-card');
@@ -256,6 +265,7 @@ courseSelector.addEventListener('change', async (e) => {
     const courseId = e.target.value;
     if (!courseId) {
         currentCourse = null;
+        globalSettings.classList.add('hidden');
         renderSlidesList([]);
         return;
     }
@@ -318,10 +328,17 @@ async function loadCourse(courseId) {
 
         console.log(`[App] Rendering ${currentCourseData.screens.length} screens`);
         renderSlidesList(currentCourseData.screens);
-        if (currentCourseData.screens.length > 0) selectSlide(0);
-        else {
-            slidesList.innerHTML = '<li class="empty-list">אין שקופיות בלומדה זו</li>';
-        }
+        
+        // Initialize Splash if not exists
+            currentCourseData.splash = {
+                title: currentCourseData.name || currentCourseData.screens[0]?.title || 'ברוכים הבאים',
+                logo: currentCourseData.screens[0]?.logo || '',
+                logoBgColor: currentCourseData.screens[0]?.logoBgColor || '#38bdf8',
+                bgImage: currentCourseData.screens[0]?.bgImage || 'bg_welcome.png',
+                styles: { transparency: 90 }
+            };
+        
+        selectSplash();
     } catch (err) {
         console.error('[App] Load course failed:', err);
         showToast('נכשל בטעינת נתוני הלומדה', 'error');
@@ -588,6 +605,11 @@ function selectSlide(index) {
     slideBg.value = screen.bgImage || '';
     bgFilename.textContent = screen.bgImage ? screen.bgImage.split('/').pop() : 'לא נבחרה תמונה';
     
+    // Transparency
+    const tr = (screen.styles && screen.styles.transparency !== undefined) ? screen.styles.transparency : 90;
+    slideTransparency.value = tr;
+    slideTransparencyVal.textContent = `${tr}%`;
+    
     // Audio/Delay
     audioPath.value = screen.audio || '';
     audioFilename.textContent = screen.audio ? screen.audio.split('/').pop() : 'לא נבחר קובץ';
@@ -603,20 +625,14 @@ function selectSlide(index) {
     renderCards(screen.cards || []);
     window.toggleQuestionFields();
 
-    // Show/Hide special fields
-    if (index === 0) {
-        logoFieldGroup.classList.remove('hidden');
-        logoPath.value = screen.logo || '';
-        logoFilename.textContent = screen.logo ? screen.logo.split('/').pop() : 'לא נבחר לוגו';
-        
-        const currentLogoColor = screen.logoBgColor || '#38bdf8';
-        logoBgColor.value = currentLogoColor;
-        logoBgColorHex.textContent = currentLogoColor;
-        
-        updateLogoPreview();
-    } else {
-        logoFieldGroup.classList.add('hidden');
-    }
+    // Restore fields
+    basicSlideFields.classList.remove('hidden');
+    logoFieldGroup.classList.add('hidden');
+    
+    // De-select splash item
+    splashItem.classList.remove('active');
+    splashItem.style.background = 'rgba(56, 189, 248, 0.05)';
+    splashItem.style.borderColor = 'rgba(56, 189, 248, 0.1)';
 
     if (screen.id === 'officer_details') {
         officerCard.classList.remove('hidden');
@@ -628,6 +644,66 @@ function selectSlide(index) {
         officerCard.classList.add('hidden');
     }
 }
+
+function selectSplash() {
+    selectedSlideIndex = -100;
+    const splash = currentCourseData.splash || { title: '', content: '', styles: { transparency: 90 } };
+    
+    // Update active state in UI
+    Array.from(slidesList.children).forEach(li => li.classList.remove('active'));
+    splashItem.classList.add('active');
+    splashItem.style.background = 'rgba(56, 189, 248, 0.15)';
+    splashItem.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+    
+    // Show form
+    noSelection.classList.add('hidden');
+    editorForm.classList.remove('hidden');
+    
+    // Fill fields
+    document.getElementById('current-slide-id-display').textContent = `עריכת מסך פתיחה (Splash)`;
+    slideTitle.value = splash.title || currentCourseData.name || '';
+    slideContent.value = ''; // We don't use content on splash
+    slideBg.value = splash.bgImage || '';
+    bgFilename.textContent = splash.bgImage ? splash.bgImage.split('/').pop() : 'לא נבחרה תמונה';
+    
+    // Transparency
+    const tr = (splash.styles && splash.styles.transparency !== undefined) ? splash.styles.transparency : 90;
+    slideTransparency.value = tr;
+    slideTransparencyVal.textContent = `${tr}%`;
+    
+    // Audio (Minimal for splash or none)
+    audioPath.value = splash.audio || '';
+    audioFilename.textContent = splash.audio ? splash.audio.split('/').pop() : 'לא נבחר קובץ';
+    waitForAudio.checked = false;
+    minDelay.value = 0;
+    
+    // Hide question/features fields
+    isQuestion.checked = false;
+    window.toggleQuestionFields();
+    officerCard.classList.add('hidden');
+    basicSlideFields.classList.add('hidden');
+    
+    // Show splash-specific fields
+    logoFieldGroup.classList.remove('hidden');
+    logoPath.value = splash.logo || '';
+    logoFilename.textContent = splash.logo ? splash.logo.split('/').pop() : 'לא נבחר לוגו';
+    logoBgColor.value = splash.logoBgColor || '#38bdf8';
+    logoBgColorHex.textContent = logoBgColor.value;
+    
+    // Logo Size
+    const sz = splash.logoSize || 150;
+    logoSize.value = sz;
+    logoSizeVal.textContent = `${sz}px`;
+    
+    // Logo Transparency
+    const alpha = (splash.logoBgTransparency !== undefined) ? splash.logoBgTransparency : 100;
+    logoBgTransparency.value = alpha;
+    logoBgTransparencyVal.textContent = `${alpha}%`;
+    
+    updateLogoPreview();
+}
+
+splashItem.onclick = selectSplash;
 
 function renderOptions(options = []) {
     optionsContainer.innerHTML = '';
@@ -769,6 +845,20 @@ window.toggleQuestionFields = function() {
 function updateCurrentSlideData() {
     if (selectedSlideIndex === -1) return;
     
+    if (selectedSlideIndex === -100) {
+        const splash = currentCourseData.splash = currentCourseData.splash || {};
+        splash.title = slideTitle.value;
+        splash.content = slideContent.value;
+        splash.bgImage = slideBg.value;
+        splash.logo = logoPath.value;
+        splash.logoBgColor = logoBgColor.value;
+        splash.logoSize = parseInt(logoSize.value);
+        splash.logoBgTransparency = parseInt(logoBgTransparency.value);
+        splash.styles = splash.styles || {};
+        splash.styles.transparency = parseInt(slideTransparency.value);
+        return;
+    }
+
     const screen = currentCourseData.screens[selectedSlideIndex];
     screen.title = slideTitle.value;
     screen.content = slideContent.value;
@@ -807,6 +897,34 @@ function updateCurrentSlideData() {
             email: officerEmail.value
         };
     }
+
+    // Capture styles
+    screen.styles = screen.styles || {};
+    screen.styles.transparency = parseInt(slideTransparency.value);
+}
+
+// Transparency Event
+if (slideTransparency) {
+    slideTransparency.oninput = (e) => {
+        const val = e.target.value;
+        slideTransparencyVal.textContent = `${val}%`;
+        
+        const screen = (selectedSlideIndex === -100) ? currentCourseData.splash : currentCourseData.screens[selectedSlideIndex];
+        if (screen) {
+            screen.styles = screen.styles || {};
+            screen.styles.transparency = parseInt(val);
+            
+            // Live Update Mockup
+            const mockupContentArea = document.querySelector('.content-area-mockup');
+            if (mockupContentArea) {
+                mockupContentArea.style.setProperty('background', `rgba(15, 23, 42, ${val / 100})`, 'important');
+            }
+        }
+    };
+    
+    slideTransparency.onchange = () => {
+        saveCourse();
+    };
 }
 
 // --- Saving ---
@@ -919,6 +1037,48 @@ window.showSlidePreview = async (index, isFull = false) => {
         previewAudio = null;
     }
 
+    if (index === -100) {
+        const splash = currentCourseData.splash || {};
+        previewSlideIdx = -100;
+        isFullPreview = false;
+        
+        const title = splash.title || currentCourseData.name || 'ברוכים הבאים';
+        const bg = splash.bgImage || '';
+        const bgUrl = getAssetUrl(bg) || (baseUrl + 'assets/bg_welcome.png');
+        const logoUrl = getAssetUrl(splash.logo || '');
+        const logoBgColorHex = splash.logoBgColor || '#38bdf8';
+        const logoAlpha = (splash.logoBgTransparency !== undefined ? splash.logoBgTransparency : 100) / 100;
+        const logoBgColorVal = hexToRgba(logoBgColorHex, logoAlpha);
+        const logoSz = splash.logoSize || 150;
+        const transparencyVal = parseInt(slideTransparency.value) || 90;
+
+        previewFrame.innerHTML = `
+            <div class="course-mockup" style="background-image: url('${bgUrl}')">
+                <div class="background-overlay"></div>
+                <div class="content-area-mockup splash-mode" 
+                     style="background: rgba(15, 23, 42, ${transparencyVal / 100}) !important; width: 75% !important; max-width: 900px !important; left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; text-align: center !important;">
+                    <div class="splash-view-mockup" style="text-align: center; direction: rtl;">
+                        ${logoUrl ? `
+                            <div class="logo-circle-mockup" style="width: ${logoSz}px; height: ${logoSz}px; margin: 0 auto 30px; background: ${logoBgColorVal}; border-radius: 50%; border: ${4 * logoAlpha}px solid rgba(255,255,255,${0.2 * logoAlpha}); display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 0 ${30 * logoAlpha}px rgba(0,0,0,${0.3 * logoAlpha});">
+                                <img src="${logoUrl}" style="max-width: 80%; max-height: 80%; object-fit: contain;">
+                            </div>
+                        ` : `
+                            <div class="logo-circle-mockup" style="width: ${logoSz}px; height: ${logoSz}px; margin: 0 auto 30px; background: ${logoBgColorVal}; border-radius: 50%; border: ${4 * logoAlpha}px solid rgba(255,255,255,${0.2 * logoAlpha}); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 ${30 * logoAlpha}px rgba(0,0,0,${0.3 * logoAlpha});">
+                                <i class="fas fa-shield-halved" style="font-size: ${logoSz/4}px; color: white;"></i>
+                            </div>
+                        `}
+                        <h1 class="cyber-glitch" style="font-size: 2.5rem; color: ${logoBgColorVal}; text-shadow: 0 0 15px rgba(56, 189, 248, 0.4);">${title}</h1>
+                    </div>
+                </div>
+                <div class="mockup-nav-bar" style="justify-content: center;">
+                    <button class="mockup-btn btn-primary" onclick="previewModal.classList.add('hidden')">סגור תצוגה מקדימה</button>
+                </div>
+            </div>
+        `;
+        previewModal.classList.remove('hidden');
+        return;
+    }
+
     if (!currentCourseData.screens[index]) return;
     previewSlideIdx = index;
     isFullPreview = isFull;
@@ -958,6 +1118,7 @@ window.showSlidePreview = async (index, isFull = false) => {
     const logoRelPath = isEditingThisSlide ? logoPath.value : (screen.logo || '');
     const logoUrl = getAssetUrl(logoRelPath);
     const logoBgColorVal = isEditingThisSlide ? logoBgColor.value : (screen.logoBgColor || '#38bdf8');
+    const transparencyVal = isEditingThisSlide ? parseInt(slideTransparency.value) : (screen.styles?.transparency || 90);
 
     const optionsHtml = (isQ && screen.question && screen.question.options) 
         ? `<div class="mockup-options" id="mockup-options-list">
@@ -1140,7 +1301,7 @@ window.showSlidePreview = async (index, isFull = false) => {
             </div>
 
             <div class="content-area-mockup ${isQ ? 'question-mode' : ''} ${isSplash ? 'splash-mode' : ''}" 
-                 style="${isSplash ? 'width: 55%; max-width: 700px; left: 50%; top: 45%; transform: translate(-50%, -50%); text-align: center;' : ''}">
+                 style="background: rgba(15, 23, 42, ${transparencyVal / 100}) !important; ${isSplash ? 'width: 75% !important; max-width: 900px !important; left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; text-align: center !important;' : ''}">
                 ${contentHtml}
             </div>
             
@@ -1662,8 +1823,36 @@ function hexToRgb(hex, alpha = 1) {
 if (logoBgColor) {
     logoBgColor.addEventListener('input', (e) => {
         logoBgColorHex.textContent = e.target.value;
+        if (selectedSlideIndex === -100) {
+            currentCourseData.splash.logoBgColor = e.target.value;
+        }
         updateLogoPreview();
     });
+
+    logoSize.addEventListener('input', (e) => {
+        const sz = e.target.value;
+        logoSizeVal.textContent = `${sz}px`;
+        if (selectedSlideIndex === -100) {
+            currentCourseData.splash.logoSize = parseInt(sz);
+        }
+    });
+
+    logoBgTransparency.addEventListener('input', (e) => {
+        const tr = e.target.value;
+        logoBgTransparencyVal.textContent = `${tr}%`;
+        if (selectedSlideIndex === -100) {
+            currentCourseData.splash.logoBgTransparency = parseInt(tr);
+        }
+        updateLogoPreview();
+    });
+}
+
+function hexToRgba(hex, alpha = 1) {
+    if (!hex || !hex.startsWith('#')) return `rgba(56, 189, 248, ${alpha})`;
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function updateLogoPreview() {

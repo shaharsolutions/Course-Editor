@@ -1,5 +1,6 @@
 (function() {
     let screens = [];
+    let splashData = null;
     let currentIndex = 0;
     let score = 0;
     let answeredCount = 0;
@@ -232,6 +233,7 @@ window.finishPhishing = () => {
                     try {
                         const parsed = JSON.parse(previewData);
                         screens = parsed.screens || [];
+                        splashData = parsed.splash || null;
                         console.log(`[StudioPlayer] Success: Loaded ${screens.length} screens from session storage (Preview Mode)`);
                         return true;
                     } catch (e) {
@@ -242,6 +244,7 @@ window.finishPhishing = () => {
                 // Priority 1: Check if data was loaded via script tag (data.js) - works offline/local
                 if (window.courseData) {
                     screens = window.courseData.screens || [];
+                    splashData = window.courseData.splash || null;
                     console.log(`[StudioPlayer] Success: Loaded ${screens.length} screens from global variable`);
                     return true;
                 }
@@ -263,6 +266,7 @@ window.finishPhishing = () => {
                 if (!data) throw new Error('Could not find data.json and no global courseData found');
                 
                 screens = data.screens || [];
+                splashData = data.splash || null;
                 console.log(`[StudioPlayer] Success: Loaded ${screens.length} screens via fetch`);
                 return true;
             } catch (e) {
@@ -278,9 +282,9 @@ window.finishPhishing = () => {
         }
 
         function updateNav() {
-            const screen = screens[currentIndex];
+            const screen = (currentIndex === -1) ? splashData : screens[currentIndex];
             const isQ = !!(screen && screen.question);
-            const isSplash = currentIndex === 0 && (screen && !screen.content && !screen.question);
+            const isSplash = (currentIndex === -1);
 
             // Per User Request: If submitted (already answered), 
             // the Check Answer button should NEVER show. Next/Prev are allowed.
@@ -297,7 +301,10 @@ window.finishPhishing = () => {
             
             if (isSplash) {
                 nextBtn.innerHTML = 'התחל למידה <i class="fas fa-play" style="margin-right:8px;"></i>';
-                nextBtn.onclick = nextSlide;
+                nextBtn.onclick = () => {
+                    if (currentIndex === -1) renderSlide(0);
+                    else nextSlide();
+                };
             } else if (isQ) {
                 nextBtn.innerHTML = 'בדוק תשובה <i class="fas fa-check" style="margin-right:8px;"></i>';
                 nextBtn.onclick = checkAnswer;
@@ -382,10 +389,23 @@ window.finishPhishing = () => {
 
         function renderSlide(index) {
             stopAllAudio();
-            if (!screens[index]) return;
+            
+            // Handle Splash Screen (index -1)
+            let screen;
+            if (index === -1 && splashData) {
+                screen = splashData;
+            } else {
+                screen = screens[index];
+            }
+            
+            if (!screen) return;
             
             // Remove splash-mode by default
             contentArea.classList.remove('splash-mode');
+            
+            // Apply per-slide transparency
+            const transparency = (screen.styles && screen.styles.transparency !== undefined) ? screen.styles.transparency : 90;
+            contentArea.style.setProperty('background', `rgba(15, 23, 42, ${transparency / 100})`, 'important');
 
             // Track time
             const now = Date.now();
@@ -397,8 +417,7 @@ window.finishPhishing = () => {
             
             currentIndex = index;
             slideStartTime = now;
-            const screen = screens[index];
-            const slideId = screen.id || `s${index}`;
+            const slideId = (index === -1) ? 'splash' : (screen.id || `s${index}`);
             
             // Restore persistent state for this slide
             const qState = questionStates[slideId];
@@ -425,7 +444,7 @@ window.finishPhishing = () => {
             }
 
             // UI
-            // UI - Background
+            // Update UI - Background
             if (screen.bgImage) {
                 const bgUrl = resolveAssetPath(screen.bgImage);
                 playerContainer.style.backgroundImage = `url('${encodeURI(bgUrl)}')`;
@@ -433,13 +452,20 @@ window.finishPhishing = () => {
             } else {
                 // Fallback to high-quality system backgrounds
                 let fallbackBg = 'bg_content.png';
-                if (index === 0) fallbackBg = 'bg_welcome.png';
+                if (index === -1 || index === 0) fallbackBg = 'bg_welcome.png';
                 else if (screen.question) fallbackBg = 'bg_quiz.png';
                 else if (index === screens.length - 1) fallbackBg = 'bg_summary.png';
                 
                 const bgUrl = resolveAssetPath(fallbackBg);
                 playerContainer.style.backgroundImage = `url('${encodeURI(bgUrl)}')`;
                 console.log(`[StudioPlayer] Using fallback background: ${fallbackBg}`);
+            }
+
+            // Ensure Splash mode is applied correctly
+            if (index === -1) {
+                contentArea.classList.add('splash-mode');
+            } else {
+                contentArea.classList.remove('splash-mode');
             }
 
             // Diagnostic check for background
@@ -472,10 +498,37 @@ window.finishPhishing = () => {
             if (cl) cl.textContent = charLabel;
 
             // Ensure character section is visible (SplashScreen hides it)
-            if (cSection) cSection.style.display = 'flex';
+            if (cSection) {
+                cSection.style.display = (index === -1) ? 'none' : 'flex';
+            }
 
             // Main Content
-            let html = screen.title ? `<h1 class="cyber-glitch animate-in">${screen.title}</h1>` : '';
+            let html = '';
+            if (index === -1) {
+                const splashLogo = resolveAssetPath(screen.logo || '');
+                const logoColorHex = screen.logoBgColor || '#38bdf8';
+                const logoAlpha = (screen.logoBgTransparency !== undefined ? screen.logoBgTransparency : 100) / 100;
+                const logoColor = hexToRgba(logoColorHex, logoAlpha);
+                const sz = screen.logoSize || 150;
+                const logoHtml = splashLogo ? `
+                    <div class="logo-placeholder" style="background: ${logoColor}; border: ${4 * logoAlpha}px solid rgba(255,255,255,${0.2 * logoAlpha}); border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 0 ${30 * logoAlpha}px rgba(0,0,0,${0.3 * logoAlpha}); margin: 0 auto 20px; width: ${sz}px; height: ${sz}px;">
+                        <img src="${encodeURI(splashLogo)}" style="max-width: 80%; max-height: 80%; object-fit: contain;">
+                    </div>
+                ` : `
+                    <div class="logo-placeholder" style="background: ${logoColor}; border: ${4 * logoAlpha}px solid rgba(255,255,255,${0.2 * logoAlpha}); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 ${30 * logoAlpha}px rgba(0,0,0,${0.3 * logoAlpha}); margin: 0 auto 20px; width: ${sz}px; height: ${sz}px;">
+                        <i class="fas fa-shield-halved" style="font-size: ${sz/4}px; color: white;"></i>
+                    </div>
+                `;
+                const title = screen.title || "ברוכים הבאים";
+                html = `
+                    <div class="splash-view animate-in" style="text-align: center;">
+                        ${logoHtml}
+                        <h1 class="cyber-glitch" style="color: ${logoColor}; font-size: 2.5rem; margin-top: 20px; text-shadow: 0 0 15px rgba(56, 189, 248, 0.3);">${title}</h1>
+                    </div>
+                `;
+            } else {
+                html = screen.title ? `<h1 class="cyber-glitch animate-in">${screen.title}</h1>` : '';
+            }
             if (screen.question) {
                 if (screen.question.text) {
                     html += `<p class="question-text animate-in delay-1">${screen.question.text}</p>`;
@@ -639,6 +692,7 @@ window.finishPhishing = () => {
             }
 
             progressBar.style.width = `${((index + 1) / screens.length) * 100}%`;
+            if (index === -1) progressBar.style.width = '0%';
             updateNav();
 
             // --- Locking Logic (minDelay & waitForAudio) ---
@@ -859,65 +913,15 @@ window.finishPhishing = () => {
             fitPlayer();
 
             restoreState();
-            // If we are at index 0 and it's a fresh start, we can show a dedicated splash
-            if (currentIndex === 0 && !SCORM.getSuspendData()?.index) {
-                renderSplashScreen();
+            restoreState();
+            // Start course
+            if (splashData && !SCORM.getSuspendData()?.index) {
+                renderSlide(-1);
             } else {
-                renderSlide(currentIndex);
+                renderSlide(currentIndex || 0);
             }
             prevBtn.onclick = () => { if (currentIndex > 0) renderSlide(currentIndex - 1); };
         }
 
-        function renderSplashScreen() {
-            // Find logo from first screen or elsewhere
-            const firstScreen = screens[0] || {};
-            const splashLogo = resolveAssetPath(firstScreen.logo || '');
-            const logoColor = firstScreen.logoBgColor || '#38bdf8';
-            const logoBg = hexToRgba(logoColor, 0.1);
-
-            // Set background for splash screen
-            if (firstScreen.bgImage) {
-                const bgUrl = resolveAssetPath(firstScreen.bgImage);
-                playerContainer.style.backgroundImage = `url('${encodeURI(bgUrl)}')`;
-            } else {
-                const bgUrl = resolveAssetPath('bg_welcome.png');
-                playerContainer.style.backgroundImage = `url('${encodeURI(bgUrl)}')`;
-            }
-
-            const cSection = document.getElementById('character-section');
-            if (cSection) cSection.style.display = 'none';
-            
-            // Add splash-mode to content area
-            contentArea.classList.add('splash-mode');
-
-            const logoHtml = splashLogo ? `
-                <div class="logo-placeholder" style="background: ${logoColor}; border: 4px solid rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 0 30px rgba(0,0,0,0.3);">
-                    <img src="${encodeURI(splashLogo)}" style="max-width: 80%; max-height: 80%; object-fit: contain;">
-                </div>
-            ` : `
-                <div class="logo-placeholder" style="background: ${logoColor}; border: 4px solid rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 30px rgba(0,0,0,0.3);">
-                    <i class="fas fa-shield-halved" style="font-size: 3rem; color: white;"></i>
-                </div>
-            `;
-
-            const title = (firstScreen.id === 'welcome' ? firstScreen.title : "ברוכים הבאים ללומדה");
-            const content = "לחצו על הכפתור למטה כדי להתחיל בלמידה.";
-
-            contentArea.innerHTML = `
-                <div class="splash-view animate-in" style="text-align: center;">
-                    ${logoHtml}
-                    <h1 class="cyber-glitch" style="color: ${logoColor}; font-size: 2.5rem; margin-top: 15px;">${title}</h1>
-                    <p class="animate-in delay-1" style="margin-bottom: 20px; font-size: 1.2rem;">${content}</p>
-                </div>
-            `;
-
-            prevBtn.style.display = 'none';
-            nextBtn.innerHTML = 'התחל למידה <i class="fas fa-play" style="margin-right:8px;"></i>';
-            nextBtn.onclick = () => {
-                // Always start from Slide 0 after the splash
-                renderSlide(0);
-            };
-            progressBar.style.width = '0%';
-        }
     });
 })();
