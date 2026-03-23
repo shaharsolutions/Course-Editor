@@ -339,6 +339,7 @@ async function loadCourse(courseId) {
         renderSlidesList(currentCourseData.screens);
         
         // Initialize Splash if not exists
+        if (!currentCourseData.splash) {
             currentCourseData.splash = {
                 title: currentCourseData.name || currentCourseData.screens[0]?.title || 'ברוכים הבאים',
                 logo: currentCourseData.screens[0]?.logo || '',
@@ -346,6 +347,7 @@ async function loadCourse(courseId) {
                 bgImage: currentCourseData.screens[0]?.bgImage || 'bg_welcome.png',
                 styles: { transparency: 90 }
             };
+        }
         
         selectSplash();
     } catch (err) {
@@ -702,7 +704,7 @@ function selectSplash() {
     
     // Fill fields
     document.getElementById('current-slide-id-display').textContent = `עריכת מסך פתיחה (Splash)`;
-    slideTitle.value = splash.title || currentCourseData.name || '';
+    slideTitle.value = currentCourseData.name || splash.title || '';
     slideContent.value = ''; // We don't use content on splash
     slideBg.value = splash.bgImage || '';
     bgFilename.textContent = splash.bgImage ? splash.bgImage.split('/').pop() : 'לא נבחרה תמונה';
@@ -896,7 +898,14 @@ function updateCurrentSlideData() {
     
     if (selectedSlideIndex === -100) {
         const splash = currentCourseData.splash = currentCourseData.splash || {};
-        splash.title = slideTitle.value;
+        
+        if (courseNameInput) {
+            currentCourseData.name = courseNameInput.value;
+            splash.title = courseNameInput.value; // Sync Splash title with Course Name
+        } else {
+            splash.title = slideTitle.value;
+        }
+
         splash.content = slideContent.value;
         splash.bgImage = slideBg.value;
         splash.logo = logoPath.value;
@@ -906,9 +915,6 @@ function updateCurrentSlideData() {
         splash.styles = splash.styles || {};
         splash.styles.transparency = parseInt(slideTransparency.value);
         
-        if (courseNameInput) {
-            currentCourseData.name = courseNameInput.value;
-        }
         return;
     }
 
@@ -1130,7 +1136,7 @@ window.showSlidePreview = async (index, isFull = false) => {
         previewSlideIdx = -100;
         isFullPreview = false;
         
-        const title = splash.title || currentCourseData.name || 'ברוכים הבאים';
+        const title = (selectedSlideIndex === -100 && courseNameInput) ? courseNameInput.value : (splash.title || currentCourseData.name || 'ברוכים הבאים');
         const bg = splash.bgImage || '';
         const bgUrl = getAssetUrl(bg) || (baseUrl + 'assets/bg_welcome.png');
         const logoUrl = getAssetUrl(splash.logo || '');
