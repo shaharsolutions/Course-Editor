@@ -1,4 +1,4 @@
-console.log('[App] Version: 2.2 - Fix 500/413 Upload Errors');
+console.log('[App] Version: 3.0 - Robust ASCII Paths & Stability Fixes');
 
 // --- Configuration ---
 const API_BASE = '/api';
@@ -153,7 +153,10 @@ if (courseFileInput) {
         const file = e.target.files[0];
         if (!file || !supabaseClient) return;
 
-        const baseName = file.name.replace('.zip', '').replace(/[^a-z0-9_\-\u0590-\u05FF]/gi, '_');
+        // Use original filename (without .zip) for the display title in the DB
+        const displayTitle = file.name.replace('.zip', '');
+        // Sanitize baseName for internal IDs and storage folders (must be ASCII safe for S3/Supabase)
+        const baseName = displayTitle.replace(/[^a-zA-Z0-9_\-]/g, '_') || 'course';
         const courseId = `${baseName}_${Date.now()}`;
         
         // Setup UI
@@ -191,7 +194,7 @@ if (courseFileInput) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     courseId: courseId, // This will be used as the new folder name
-                    baseName: baseName,
+                    baseName: displayTitle,
                     zipPath: zipPath
                 })
             });
@@ -271,7 +274,7 @@ courseSelector.addEventListener('change', async (e) => {
     const courseId = e.target.value;
     if (!courseId) {
         currentCourse = null;
-        globalSettings.classList.add('hidden');
+        if (bulkActions) bulkActions.classList.add('hidden');
         renderSlidesList([]);
         return;
     }
@@ -434,7 +437,7 @@ function renderSlidesList(screens) {
         else if (screen.question) iconHtml = '<i class="fas fa-question-circle" style="color: #a78bfa; margin-left: 5px;"></i> ';
         else iconHtml = '<i class="far fa-file-alt" style="color: var(--text-dim); margin-left: 5px;"></i> ';
         
-        titleSpan.innerHTML = iconHtml + (screen.title || 'שקף ללא כותרת');
+        titleSpan.innerHTML = `<span class="slide-number" style="color: var(--text-dim); font-size: 0.75rem; min-width: 20px; display: inline-block;">${index + 1}.</span> ` + iconHtml + (screen.title || 'שקף ללא כותרת');
         leftSide.appendChild(titleSpan);
         
         li.appendChild(leftSide);
@@ -1057,22 +1060,42 @@ function getAssetUrl(pth) {
     if (!pth || !currentCourse) return pth;
     if (pth.startsWith('http') || pth.startsWith('blob:') || pth.startsWith('data:')) return pth;
 
-    // Check if it's a local system asset
     const systemAssets = ['maya_guide.png', 'mia_transparent_v4.png', 'bg_welcome.png', 'bg_content.png', 'bg_quiz.png', 'bg_summary.png'];
-    let clean = pth.split('/').pop();
-    if (systemAssets.includes(clean)) {
-        return 'assets/' + clean;
+    const filename = pth.split('/').pop();
+
+    // --- Legacy Remapping (Map old system names to existing ones) ---
+    const legacyMap = {
+        'new_scene_welcome.png': 'bg_welcome.png',
+        'scene_welcome.png': 'bg_welcome.png',
+        'new_scene_explanation.png': 'bg_content.png',
+        'scene_content.png': 'bg_content.png',
+        'new_scene_quiz.png': 'bg_quiz.png',
+        'scene_quiz.png': 'bg_quiz.png',
+        'new_scene_summary.png': 'bg_summary.png',
+        'new_scene_congrats.png': 'bg_summary.png'
+    };
+    const cleanName = legacyMap[filename] || filename;
+
+    if (systemAssets.includes(cleanName)) {
+        return 'assets/' + cleanName;
     }
 
+    if (supabaseClient) {
+        let filePath = pth;
+        if (filePath.startsWith(currentCourse + '/')) {
+            filePath = filePath.substring(currentCourse.length + 1);
+        }
+        const fullPath = `${currentCourse}/${filePath}`.replace(/\/+/g, '/').replace(/^\//, '');
+        const { data } = supabaseClient.storage.from('course-assets').getPublicUrl(fullPath);
+        return data.publicUrl;
+    }
+
+    // Manual fallback if client is not ready
     const storageUrl = `${SUPABASE_URL}/storage/v1/object/public/course-assets/${currentCourse}/`;
-    
-    // Strip leading course ID if it exists and duplicated
-    clean = pth;
+    let clean = pth;
     if (currentCourse && clean.startsWith(currentCourse + '/')) {
         clean = clean.substring(currentCourse.length + 1);
     }
-    
-    // Final slash-cleaning and encoding
     clean = clean.replace(/\/+/g, '/').replace(/^\//, '');
     return storageUrl + encodeURI(clean);
 }
@@ -1953,9 +1976,16 @@ function updateLogoPreview() {
     logoPreviewCircle.style.boxShadow = `0 0 15px rgba(0,0,0,0.3)`;
     
     if (logoPath && logoPath.value) {
-        logoPreviewImg.src = getAssetUrl(logoPath.value);
-        logoPreviewImg.style.display = 'block';
-        logoPreviewPlaceholder.style.display = 'none';
+        const url = getAssetUrl(logoPath.value);
+        logoPreviewImg.src = url;
+        logoPreviewImg.onerror = () => {
+            logoPreviewImg.style.display = 'none';
+            logoPreviewPlaceholder.style.display = 'block';
+        };
+        logoPreviewImg.onload = () => {
+            logoPreviewImg.style.display = 'block';
+            logoPreviewPlaceholder.style.display = 'none';
+        };
     } else {
         logoPreviewImg.style.display = 'none';
         logoPreviewPlaceholder.style.display = 'block';

@@ -104,18 +104,30 @@
         // Files that are NOT system assets should be fetched from Supabase Storage.
         const previewCourseId = sessionStorage.getItem('previewCourseId');
         const systemAssets = ['maya_guide.png', 'mia_transparent_v4.png', 'bg_welcome.png', 'bg_content.png', 'bg_quiz.png', 'bg_summary.png'];
+        const filename = clean.split('/').pop();
         
-        if (previewCourseId && !systemAssets.includes(clean)) {
+        // --- Legacy Remapping (Map old system names to existing ones) ---
+        const legacyMap = {
+            'new_scene_welcome.png': 'bg_welcome.png',
+            'scene_welcome.png': 'bg_welcome.png',
+            'new_scene_explanation.png': 'bg_content.png',
+            'scene_content.png': 'bg_content.png',
+            'new_scene_quiz.png': 'bg_quiz.png',
+            'scene_quiz.png': 'bg_quiz.png',
+            'new_scene_summary.png': 'bg_summary.png',
+            'new_scene_congrats.png': 'bg_summary.png'
+        };
+        const cleanName = legacyMap[filename] || filename;
+
+        if (previewCourseId && !systemAssets.includes(cleanName)) {
             const SUPABASE_URL = 'https://iduyexkzivtnvrdsbwig.supabase.co';
             return `${SUPABASE_URL}/storage/v1/object/public/course-assets/${previewCourseId}/${clean.replace(/\/+/g, '/').replace(/^\//, '')}`;
         }
         
         // Normal published mode OR system asset
         // If it's a known system asset, it lives in the 'assets/' folder.
-        // Otherwise, use the path as provided in data.json (which matches the ZIP structure).
-        const filename = clean.split('/').pop();
-        if (systemAssets.includes(filename)) {
-            return 'assets/' + filename;
+        if (systemAssets.includes(cleanName)) {
+            return 'assets/' + cleanName;
         }
         
         return clean.replace(/\/+/g, '/');

@@ -195,6 +195,7 @@ header h1 {
     align-items: center;
     gap: 12px;
     flex: 1;
+    min-width: 0; /* Critical for ellipsis and flex shrinking */
 }
 
 .slide-title-text {
@@ -203,6 +204,9 @@ header h1 {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: block;
+    flex: 1;
+    min-width: 0;
 }
 
 .delete-slide-btn {
