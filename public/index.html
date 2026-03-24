@@ -269,6 +269,7 @@
                                     <span id="audio-filename" class="filename-display" style="margin-right: 15px;">לא נבחר קובץ</span>
                                 </div>
                                 <input type="hidden" id="audio-path">
+                                <input type="file" id="shared-audio-upload" class="hidden" accept="audio/*">
                             </div>
 
                             <div class="form-group inline-group" style="margin-top: 10px;">
@@ -350,6 +351,26 @@
                                 <div class="form-group" style="margin-top: 20px;">
                                     <label>משוב לאחר מענה</label>
                                     <textarea id="question-feedback" rows="3" placeholder="כל הכבוד! התשובה נכונה..."></textarea>
+                                </div>
+
+                                <div class="form-group" style="margin-top: 10px;">
+                                    <label>קריינות למשוב</label>
+                                    <div class="upload-wrapper">
+                                        <input type="file" id="feedback-audio-upload" accept="audio/*" class="hidden">
+                                        <button type="button" class="upload-btn" onclick="document.getElementById('feedback-audio-upload').click()">
+                                            <i class="fas fa-music"></i> בחר קריינות
+                                        </button>
+                                        <span id="feedback-audio-filename" class="filename-display" style="margin-right: 15px;">לא נבחר קובץ</span>
+                                    </div>
+                                    <input type="hidden" id="feedback-audio-path">
+                                </div>
+
+                                <div class="form-group" style="margin-top: 10px;">
+                                    <label>התנהגות שמע</label>
+                                    <select id="feedback-audio-behavior" style="width: 100%; padding: 8px; border-radius: 8px; background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(255,255,255,0.1); color: white;">
+                                        <option value="interrupt">עצור קריירת שקף ונגן מיד</option>
+                                        <option value="wait">המתן לסיום קריירת השקף</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>

@@ -445,7 +445,11 @@ function renderSlidesList(screens) {
         else if (screen.question) iconHtml = '<i class="fas fa-question-circle" style="color: #a78bfa; margin-left: 5px;"></i> ';
         else iconHtml = '<i class="far fa-file-alt" style="color: var(--text-dim); margin-left: 5px;"></i> ';
         
-        titleSpan.innerHTML = `<span class="slide-number" style="color: var(--text-dim); font-size: 0.75rem; min-width: 20px; display: inline-block;">${index + 1}.</span> ` + iconHtml + (screen.title || 'שקף ללא כותרת');
+        let suffixIcons = '';
+        if (screen.alerts && screen.alerts.length > 0) suffixIcons += ' <i class="fas fa-exclamation-triangle" style="color: #fbbf24; font-size: 0.75rem; margin-left: 5px;" title="מכיל התראות"></i>';
+        if (screen.cards && screen.cards.length > 0) suffixIcons += ' <i class="fas fa-layer-group" style="color: #60a5fa; font-size: 0.75rem; margin-left: 5px;" title="מכיל כרטיסיות"></i>';
+
+        titleSpan.innerHTML = `<span class="slide-number" style="color: var(--text-dim); font-size: 0.75rem; min-width: 20px; display: inline-block;">${index + 1}.</span> ` + iconHtml + suffixIcons + (screen.title || 'שקף ללא כותרת');
         leftSide.appendChild(titleSpan);
         
         li.appendChild(leftSide);
@@ -670,6 +674,13 @@ function selectSlide(index) {
     isQuestion.checked = !!screen.question;
     questionText.value = screen.question ? screen.question.text : '';
     questionFeedback.value = (screen.question && screen.question.feedback) ? screen.question.feedback : '';
+    
+    // Feedback Audio Settings
+    const feedbackAudioPth = (screen.question && screen.question.feedbackAudio) ? screen.question.feedbackAudio : '';
+    document.getElementById('feedback-audio-path').value = feedbackAudioPth;
+    document.getElementById('feedback-audio-filename').textContent = feedbackAudioPth ? feedbackAudioPth.split('/').pop() : 'לא נבחר קובץ';
+    document.getElementById('feedback-audio-behavior').value = (screen.question && screen.question.feedbackAudioBehavior) ? screen.question.feedbackAudioBehavior : 'interrupt';
+
     renderOptions(screen.question ? screen.question.options : []);
     renderAlerts(screen.alerts || []);
     renderCards(screen.cards || []);
@@ -1058,6 +1069,28 @@ function renderAlerts(alerts = []) {
                     </select>
                 </div>
             </div>
+
+            <!-- Alert Audio Selection -->
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.05);">
+                <button type="button" class="upload-btn" style="padding: 4px 8px; font-size: 0.7rem; background: rgba(56, 189, 248, 0.1);" onclick="triggerAlertAudioUpload(${idx})">
+                    <i class="fas fa-volume-up"></i> ${alert.audio ? 'החלף קריינות' : 'הוסף קריינות'}
+                </button>
+                <span id="alert-audio-filename-${idx}" style="font-size: 0.7rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px;">
+                    ${alert.audio ? alert.audio.split('/').pop() : 'ללא סאונד'}
+                </span>
+                ${alert.audio ? `
+                    <button type="button" class="text-btn" style="color: #f87171; font-size: 0.7rem;" onclick="currentCourseData.screens[selectedSlideIndex].alerts[${idx}].audio = null; renderAlerts(currentCourseData.screens[selectedSlideIndex].alerts); renderSlidesList(currentCourseData.screens)">
+                        <i class="fas fa-times"></i> הסר
+                    </button>
+                    <div style="margin-right: 8px;">
+                        <select onchange="currentCourseData.screens[selectedSlideIndex].alerts[${idx}].audioBehavior = this.value" style="padding: 2px 4px; font-size: 0.7rem; border-radius: 4px;">
+                            <option value="interrupt" ${alert.audioBehavior === 'interrupt' ? 'selected' : ''}>עצור שקף</option>
+                            <option value="wait" ${alert.audioBehavior === 'wait' ? 'selected' : ''}>המתן לשקף</option>
+                        </select>
+                    </div>
+                ` : ''}
+            </div>
+
             <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.05);">
                 <input type="checkbox" id="alert-wait-typing-${idx}" ${alert.waitForTyping ? 'checked' : ''} onchange="currentCourseData.screens[selectedSlideIndex].alerts[${idx}].waitForTyping = this.checked">
                 <label for="alert-wait-typing-${idx}" style="font-size: 0.8rem; color: #e2e8f0; cursor: pointer;">הצג רק בסיום הכתיבה</label>
@@ -1073,6 +1106,7 @@ addAlertBtn.onclick = () => {
     screen.alerts = screen.alerts || [];
     screen.alerts.push({ type: 'info', title: '', text: '', delay: 0, animation: 'slide-right' });
     renderAlerts(screen.alerts);
+    renderSlidesList(currentCourseData.screens);
 };
 
 function renderCards(cards = []) {
@@ -1084,9 +1118,31 @@ function renderCards(cards = []) {
         div.innerHTML = `
             <div style="display: flex; gap: 8px; margin-bottom: 8px;">
                 <input type="text" value="${card.title || ''}" placeholder="כותרת הכרטיסייה..." oninput="currentCourseData.screens[selectedSlideIndex].cards[${idx}].title = this.value" style="flex: 1;">
-                <button type="button" class="upload-btn" style="padding: 8px; background: transparent;" onclick="currentCourseData.screens[selectedSlideIndex].cards.splice(${idx}, 1); renderCards(currentCourseData.screens[selectedSlideIndex].cards)"><i class="fas fa-times"></i></button>
+                <button type="button" class="upload-btn" style="padding: 8px; background: transparent;" onclick="currentCourseData.screens[selectedSlideIndex].cards.splice(${idx}, 1); renderCards(currentCourseData.screens[selectedSlideIndex].cards); renderSlidesList(currentCourseData.screens)"><i class="fas fa-times"></i></button>
             </div>
             <textarea placeholder="תוכן הצד האחורי..." oninput="currentCourseData.screens[selectedSlideIndex].cards[${idx}].text = this.value" style="width: 100%; min-height: 50px;">${card.text || ''}</textarea>
+            
+            <!-- Card Audio Selection -->
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.05);">
+                <button type="button" class="upload-btn" style="padding: 4px 8px; font-size: 0.7rem; background: rgba(56, 189, 248, 0.1);" onclick="triggerCardAudioUpload(${idx})">
+                    <i class="fas fa-volume-up"></i> ${card.audio ? 'החלף קריינות' : 'הוסף קריינות'}
+                </button>
+                <span id="card-audio-filename-${idx}" style="font-size: 0.7rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px;">
+                    ${card.audio ? card.audio.split('/').pop() : 'ללא סאונד'}
+                </span>
+                ${card.audio ? `
+                    <button type="button" class="text-btn" style="color: #f87171; font-size: 0.7rem;" onclick="currentCourseData.screens[selectedSlideIndex].cards[${idx}].audio = null; renderCards(currentCourseData.screens[selectedSlideIndex].cards)">
+                        <i class="fas fa-times"></i> הסר
+                    </button>
+                    <div style="margin-right: 8px;">
+                        <select onchange="currentCourseData.screens[selectedSlideIndex].cards[${idx}].audioBehavior = this.value" style="padding: 2px 4px; font-size: 0.7rem; border-radius: 4px;">
+                            <option value="interrupt" ${card.audioBehavior === 'interrupt' ? 'selected' : ''}>עצור שקף</option>
+                            <option value="wait" ${card.audioBehavior === 'wait' ? 'selected' : ''}>המתן לשקף</option>
+                        </select>
+                    </div>
+                ` : ''}
+            </div>
+
             <div style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
                 <label style="font-size: 0.7rem;">אייקון FontAwesome (למשל fas fa-shield-alt)</label>
                 <input type="text" value="${card.icon || 'fas fa-shield-alt'}" oninput="currentCourseData.screens[selectedSlideIndex].cards[${idx}].icon = this.value" style="width: 150px; font-size: 0.8rem;">
@@ -1102,6 +1158,7 @@ addCardBtn.onclick = () => {
     screen.cards = screen.cards || [];
     screen.cards.push({ title: '', text: '', icon: 'fas fa-shield-alt' });
     renderCards(screen.cards);
+    renderSlidesList(currentCourseData.screens);
 };
 
 window.toggleQuestionFields = function() {
@@ -1149,6 +1206,8 @@ function updateCurrentSlideData() {
         screen.question = screen.question || { text: '', options: [], feedback: '' };
         screen.question.text = questionText.value;
         screen.question.feedback = questionFeedback.value;
+        screen.question.feedbackAudio = document.getElementById('feedback-audio-path').value;
+        screen.question.feedbackAudioBehavior = document.getElementById('feedback-audio-behavior').value;
         // options are updated in-place during input
     } else {
         delete screen.question;
@@ -1328,6 +1387,34 @@ const previewModal = document.getElementById('preview-modal');
 const previewFrame = document.getElementById('preview-frame');
 const closeModal = document.querySelector('.close-modal');
 let previewAudio = null;
+let previewNarrationAudio = null;
+
+function playMockupNarration(audioPath, behavior = 'interrupt') {
+    if (!audioPath) return;
+    const url = getAssetUrl(audioPath);
+    if (!url) return;
+
+    const startNow = () => {
+        if (previewNarrationAudio) {
+            previewNarrationAudio.pause();
+            previewNarrationAudio.currentTime = 0;
+            previewNarrationAudio = null;
+        }
+        previewNarrationAudio = new Audio(url);
+        previewNarrationAudio.play().catch(e => console.warn('[Mockup Narration] Play blocked:', e));
+    };
+
+    if (behavior === 'wait' && previewAudio && !previewAudio.paused && !previewAudio.ended) {
+        console.log('[Mockup Narration] Waiting for slide audio...');
+        previewAudio.addEventListener('ended', startNow, { once: true });
+    } else {
+        if (behavior === 'interrupt' && previewAudio && !previewAudio.paused) {
+            console.log('[Mockup Narration] Interrupting slide audio...');
+            previewAudio.pause();
+        }
+        startNow();
+    }
+}
 
 // --- Preview Logic ---
 let previewSlideIdx = 0;
@@ -1336,8 +1423,11 @@ let selectedMockupIndex = -1;
 let hasSubmittedAnswer = false;
 let previewQuestionStates = {};
 
-window.toggleMockupCard = (el) => {
+window.toggleMockupCard = (el, audioPath, behavior = 'interrupt') => {
     el.classList.toggle('flipped');
+    if (el.classList.contains('flipped') && audioPath) {
+        playMockupNarration(audioPath, behavior);
+    }
 };
 
 window.showSlidePreview = async (index, isFull = false) => {
@@ -1461,7 +1551,7 @@ window.showSlidePreview = async (index, isFull = false) => {
     const cardsHtml = (screen.cards && screen.cards.length > 0)
         ? `<div class="info-cards-container">
             ${screen.cards.map(card => `
-                <div class="info-card" onclick="toggleMockupCard(this)">
+                <div class="info-card" onclick="toggleMockupCard(this, '${card.audio || ''}', '${card.audioBehavior || 'interrupt'}')">
                     <div class="card-inner">
                         <div class="card-front">
                             <i class="${card.icon || 'fas fa-shield-alt'}"></i>
@@ -1764,8 +1854,24 @@ window.showSlidePreview = async (index, isFull = false) => {
             }
         };
 
-        previewAudio.play().catch(e => console.log('Audio play failed:', e));
     }
+
+    // --- Mockup Alert Audio Timers ---
+    if (screen.alerts) {
+        screen.alerts.forEach(alert => {
+            if (alert.audio) {
+                const delayMilli = (alert.delay || 0) * 1000;
+                setTimeout(() => {
+                    // Check if still on the same slide preview
+                    if (previewSlideIdx === index) {
+                        playMockupNarration(alert.audio, alert.audioBehavior || 'interrupt');
+                    }
+                }, delayMilli);
+            }
+        });
+    }
+
+    previewModal.classList.remove('hidden');
 }
 
 window.nextPreviewSlide = () => {
@@ -2057,6 +2163,79 @@ bgUpload.onchange = async (e) => {
     }
 };
 
+// --- Element-Specific Audio Uploads ---
+window.activeUploadTask = null; // { type: 'alert' | 'card', idx: number }
+
+const feedbackAudioUpload = document.getElementById('feedback-audio-upload');
+const sharedAudioUpload = document.getElementById('shared-audio-upload');
+
+if (feedbackAudioUpload) {
+    feedbackAudioUpload.onchange = (e) => handleElementAudioUpload(e, 'feedback');
+}
+
+if (sharedAudioUpload) {
+    sharedAudioUpload.onchange = (e) => {
+        if (!window.activeUploadTask) return;
+        handleElementAudioUpload(e, window.activeUploadTask.type, window.activeUploadTask.idx);
+    };
+}
+
+window.triggerAlertAudioUpload = (idx) => {
+    window.activeUploadTask = { type: 'alert', idx: idx };
+    sharedAudioUpload.click();
+};
+
+window.triggerCardAudioUpload = (idx) => {
+    window.activeUploadTask = { type: 'card', idx: idx };
+    sharedAudioUpload.click();
+};
+
+async function handleElementAudioUpload(e, type, idx = -1) {
+    const file = e.target.files[0];
+    if (!file || !currentCourse) return;
+    
+    showToast('מעלה קובץ...', 'info');
+    
+    try {
+        const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9_\-.]/g, '_');
+        const folder = type === 'feedback' ? 'feedback' : (type === 'alert' ? 'alerts' : 'cards');
+        const filePath = `${currentCourse}/${folder}/${Date.now()}_${sanitizedFileName}`;
+        
+        const { data, error } = await supabaseClient.storage
+            .from('course-assets')
+            .upload(filePath, file);
+        
+        if (error) throw error;
+        
+        const screen = currentCourseData.screens[selectedSlideIndex];
+        
+        if (type === 'feedback') {
+            document.getElementById('feedback-audio-path').value = filePath;
+            document.getElementById('feedback-audio-filename').textContent = file.name;
+            if (screen && screen.question) screen.question.feedbackAudio = filePath;
+        } else if (type === 'alert') {
+            if (screen && screen.alerts && screen.alerts[idx]) {
+                screen.alerts[idx].audio = filePath;
+                renderAlerts(screen.alerts);
+            }
+        } else if (type === 'card') {
+            if (screen && screen.cards && screen.cards[idx]) {
+                screen.cards[idx].audio = filePath;
+                renderCards(screen.cards);
+            }
+        }
+        
+        await saveCourse();
+        showToast('הקובץ הועלה בהצלחה!');
+    } catch (err) {
+        console.error('[App] Element audio upload failed:', err);
+        showToast('שגיאה בהעלאת הקובץ', 'error');
+    } finally {
+        e.target.value = '';
+    }
+}
+
+
 
 document.getElementById('add-slide-btn').onclick = () => {
     if (!currentCourse) {
@@ -2093,12 +2272,30 @@ function showPersistentToast(message, type = 'info') {
     return message; // Simple way to track
 }
 
-function showMockupFeedback(question, message, onContinue = null) {
+function showMockupFeedback(question, message, onComplete = null) {
     const mockup = document.querySelector('.course-mockup');
     if (!mockup) return;
 
     let modal = document.getElementById('mockup-feedback-modal');
     let backdrop = document.getElementById('mockup-feedback-backdrop');
+    
+    // Stop any existing preview audio
+    if (previewAudio) {
+        previewAudio.pause();
+        previewAudio.currentTime = 0;
+        previewAudio = null;
+    }
+
+    if (previewNarrationAudio) {
+        previewNarrationAudio.pause();
+        previewNarrationAudio.currentTime = 0;
+        previewNarrationAudio = null;
+    }
+
+    const screen = currentCourseData.screens[previewSlideIdx];
+    if (screen && screen.question && screen.question.feedbackAudio) {
+        playMockupNarration(screen.question.feedbackAudio, screen.question.feedbackAudioBehavior || 'interrupt');
+    }
     
     if (!modal) {
         modal = document.createElement('div');

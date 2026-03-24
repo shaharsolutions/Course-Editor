@@ -75,16 +75,9 @@ body::after {
     text-align: center !important;
 }
 
-#content-area.phishing-mode {
-    width: 52% !important;
-    max-width: 680px !important;
-    padding: 12px !important;
-    border-radius: 14px !important;
-    background: rgba(15, 23, 42, 0.98) !important;
-    margin-top: -7px !important;
-    max-height: 78vh !important;
-    display: flex !important;
-    flex-direction: column !important;
+.content-area-mockup.phishing-mode h1 {
+    font-size: 1.5rem !important;
+    margin-bottom: 10px !important;
 }
 
 
@@ -135,13 +128,13 @@ body::after {
     transform: translateY(-50%);
     width: 42%;
     max-width: 600px;
-    max-height: 80vh;
+    max-height: 88%;
     background: rgba(15, 23, 42, 0.9);
     border: 1px solid var(--border);
     border-radius: 20px;
     padding: 30px;
     backdrop-filter: blur(15px);
-    z-index: 100 !important; /* Extremely high for interaction safety */
+    z-index: 100 !important;
     text-align: right;
     direction: rtl;
     overflow-y: auto;
@@ -658,7 +651,7 @@ p { color: var(--text-main); line-height: 1.7; font-size: 1.15rem; }
     overflow-x: hidden;
     width: 100%;
     max-width: 100%;
-    max-height: 45vh; /* Fixed: Constrain height to prevent overflow */
+    max-height: none; /* Changed from 45vh to allow flex to manage */
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     direction: rtl;
     text-align: right;
@@ -844,4 +837,76 @@ p { color: var(--text-main); line-height: 1.7; font-size: 1.15rem; }
 @keyframes bounceYRev {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-5px); }
+}
+
+/* --- Phishing Mode (Final Priority Fix) --- */
+#content-area.phishing-mode {
+    width: 48% !important;
+    max-width: 680px !important;
+    padding: 24px 30px !important;
+    border-radius: 14px !important;
+    background: rgba(15, 23, 42, 0.98) !important;
+    top: 50% !important;
+    left: 5% !important;
+    transform: translateY(-50%) !important;
+    max-height: calc(100% - 120px) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    z-index: 500 !important;
+}
+
+#content-area.phishing-mode h1 {
+    font-size: 1.5rem !important;
+    margin-bottom: 15px !important;
+    margin-top: 5px !important;
+    color: var(--primary) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+#content-area.phishing-mode p {
+    font-size: 1rem !important;
+    margin-bottom: 12px !important;
+    color: #e2e8f0 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+#content-area.phishing-mode .phishing-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.content-area-mockup.phishing-mode {
+    width: 48% !important;
+    max-width: 680px !important;
+    padding: 24px 30px !important;
+    border-radius: 14px !important;
+    background: rgba(15, 23, 42, 0.98) !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    max-height: calc(100% - 120px) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+/* Darken email mockup text */
+#content-area.phishing-mode .email-mockup,
+#content-area.phishing-mode .email-mockup p,
+#content-area.phishing-mode .email-mockup span,
+#content-area.phishing-mode .email-mockup div,
+#content-area.phishing-mode .email-body,
+#content-area.phishing-mode .email-body p {
+    color: #1a1a1a !important;
+}
+
+#content-area.phishing-mode .email-header-label,
+#content-area.phishing-mode .email-os-header {
+    color: #4b5563 !important;
 }

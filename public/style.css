@@ -859,7 +859,7 @@ input:checked + .slider:before {
 
 .content-area-mockup {
     position: absolute; top: 50%; left: 5%; transform: translateY(-50%);
-    width: 42%; max-width: 550px; max-height: 80vh;
+    width: 42%; max-width: 550px; max-height: 88%;
     background: rgba(15, 23, 42, 0.95); border: 1px solid var(--border);
     border-radius: 20px; padding: 35px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     z-index: 200; display: flex; flex-direction: column; text-align: right;
@@ -867,21 +867,24 @@ input:checked + .slider:before {
 }
 
 .content-area-mockup.phishing-mode {
-    width: 52% !important;
+    width: 46% !important;
     max-width: 680px !important;
-    padding: 12px !important;
+    padding: 24px 30px !important;
     border-radius: 14px !important;
     background: rgba(15, 23, 42, 0.98) !important;
-    margin-top: -7px !important;
-    max-height: 78vh !important;
+    top: 50% !important;
+    left: 5% !important;
+    transform: translateY(-50%) !important;
+    max-height: calc(100% - 20px) !important;
     display: flex !important;
     flex-direction: column !important;
+    overflow: hidden !important;
 }
 
 
 .content-area-mockup.phishing-mode h1 {
-    font-size: 1.5rem;
-    margin-bottom: 12px;
+    font-size: 1.5rem !important;
+    margin-bottom: 10px !important;
 }
 
 
@@ -1276,4 +1279,48 @@ li[draggable="true"] {
 
 li[draggable="true"]:active {
     cursor: grabbing;
+}
+
+/* --- Phishing Mode (Final Priority Fix) --- */
+.content-area-mockup.phishing-mode {
+    width: 48% !important;
+    max-width: 680px !important;
+    padding: 24px 30px !important;
+    border-radius: 14px !important;
+    background: rgba(15, 23, 42, 0.98) !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    max-height: calc(100% - 120px) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    z-index: 500 !important;
+}
+
+.content-area-mockup.phishing-mode h1 {
+    font-size: 1.5rem !important;
+    margin-bottom: 15px !important;
+    margin-top: 5px !important;
+    color: var(--primary) !important;
+}
+
+.content-area-mockup.phishing-mode p {
+    font-size: 1rem !important;
+    margin-bottom: 12px !important;
+    color: #e2e8f0 !important;
+}
+
+/* Darken email mockup text */
+.content-area-mockup.phishing-mode .email-mockup,
+.content-area-mockup.phishing-mode .email-mockup p,
+.content-area-mockup.phishing-mode .email-mockup span,
+.content-area-mockup.phishing-mode .email-mockup div,
+.content-area-mockup.phishing-mode .email-body,
+.content-area-mockup.phishing-mode .email-body p {
+    color: #1a1a1a !important;
+}
+
+.content-area-mockup.phishing-mode .email-header-label,
+.content-area-mockup.phishing-mode .email-os-header {
+    color: #4b5563 !important;
 }

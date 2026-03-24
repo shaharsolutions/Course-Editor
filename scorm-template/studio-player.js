@@ -13,11 +13,46 @@
 
     console.log('[StudioPlayer] Initialization started');
 
+    let currentNarrationAudio = null;
+
     function stopAllAudio() {
         if (currentAudio) {
             currentAudio.pause();
             currentAudio.currentTime = 0;
             currentAudio = null;
+        }
+        if (currentNarrationAudio) {
+            currentNarrationAudio.pause();
+            currentNarrationAudio.currentTime = 0;
+            currentNarrationAudio = null;
+        }
+    }
+
+    function playNarration(audioPath, behavior = 'interrupt') {
+        if (!audioPath) return;
+        const url = resolveAssetPath(audioPath);
+        
+        const startNow = () => {
+            if (currentNarrationAudio) {
+                currentNarrationAudio.pause();
+                currentNarrationAudio.currentTime = 0;
+                currentNarrationAudio = null;
+            }
+            const na = new Audio(url);
+            currentNarrationAudio = na;
+            na.play().catch(e => console.warn('[Narration] Play blocked:', e));
+        };
+
+        if (behavior === 'wait' && currentAudio && !currentAudio.paused && !currentAudio.ended) {
+            console.log('[Narration] Waiting for slide audio to finish...');
+            currentAudio.addEventListener('ended', startNow, { once: true });
+        } else {
+            if (behavior === 'interrupt' && currentAudio && !currentAudio.paused) {
+                console.log('[Narration] Interrupting slide audio...');
+                currentAudio.pause();
+                // We don't necessarily reset slide audio time, just pause it.
+            }
+            startNow();
         }
     }
 
@@ -167,14 +202,18 @@
         }
 
         // Global helper for flip cards
-        window.toggleCard = (el) => {
-            el.classList.toggle('flipped');
-            if (el.classList.contains('flipped')) {
-                el.classList.add('was-flipped');
-                // Signal that an activity occurred (like flipping a card)
-                if (window.onSlideActivity) window.onSlideActivity();
+    window.toggleCard = (el, audioPath, behavior = 'interrupt') => {
+        el.classList.toggle('flipped');
+        if (el.classList.contains('flipped')) {
+            el.classList.add('was-flipped');
+            // Signal that an activity occurred (like flipping a card)
+            if (window.onSlideActivity) window.onSlideActivity();
+
+            if (audioPath) {
+                playNarration(audioPath, behavior);
             }
-        };
+        }
+    };
 
         // Global helpers
 window.foundFlags = new Set();
@@ -627,7 +666,7 @@ window.finishPhishing = () => {
                 window.foundFlags = new Set();
                 window.totalFlags = 3;
                 html += `
-                    <div class="phishing-container animate-in delay-2" style="text-align: right; direction: rtl; width: 100%; margin: 0 auto; display: flex; flex-direction: column; height: 100%; flex: 1; min-height: 0; overflow: hidden;">
+                    <div class="phishing-container animate-in delay-2" style="text-align: right; direction: rtl; width: 100%; margin: 0 auto; display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
                         <div style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px;">
                             <p style="margin: 0; font-size: 1.15rem; font-weight: 600; color: #e2e8f0; line-height: 1.4;">${screen.content || 'זהה את כל נורות האזהרה באימייל הבא:'}</p>
                             <div class="phishing-counter" style="align-self: flex-start; margin: 0; padding: 6px 16px; background: rgba(56, 189, 248, 0.1); border: 1px solid #38bdf8; border-radius: 20px; color: #38bdf8; font-size: 0.95rem; white-space: nowrap;">
@@ -636,7 +675,7 @@ window.finishPhishing = () => {
                         </div>
                         
                         <!-- Visual Feedback Area - compact and potentially absolute or semi-absolute -->
-                        <div id="phishing-feedback-area" style="max-height: 25vh; overflow-y: auto; margin-bottom: 8px; flex-shrink: 0;"></div>
+                        <div id="phishing-feedback-area" style="max-height: 35%; overflow-y: auto; margin-bottom: 8px; flex-shrink: 0;"></div>
                         
                         <div class="email-mockup delay-3" style="font-size: 0.85rem; overflow-y: auto; color: #1e293b; background: #ffffff; flex: 1; min-height: 0; border: 1px solid #d1d5db; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-radius: 10px; display: flex; flex-direction: column;">
                             <div class="email-os-header" style="flex-shrink: 0; padding: 8px 15px;">
@@ -707,9 +746,10 @@ window.finishPhishing = () => {
                             const animClass = alert.animation ? `anim-${alert.animation}` : `animate-in delay-${Math.min(i+2, 4)}`;
                             const classes = `alert-box ${alert.type || 'info'} ${isWaiting ? 'waiting-for-typing' : animClass}`;
                             const dataAnim = isWaiting ? `data-anim="${animClass}"` : '';
+                            const dataAudio = (isWaiting && alert.audio) ? `data-audio="${alert.audio}" data-audio-behavior="${alert.audioBehavior || 'interrupt'}"` : '';
                             const customDelay = alert.delay !== undefined ? `animation-delay: ${alert.delay}s;` : '';
                             return `
-                                <div class="${classes}" ${dataAnim} style="${customDelay}">
+                                <div class="${classes}" ${dataAnim} ${dataAudio} style="${customDelay}">
                                     <i class="${alert.icon || 'fas fa-info-circle'}"></i>
                                     <div class="alert-content">
                                         <h4>${alert.title || ''}</h4>
@@ -724,7 +764,7 @@ window.finishPhishing = () => {
                 if (screen.cards) {
                     html += `<div class="info-cards-container">
                         ${(screen.cards || []).map((card, i) => `
-                            <div class="info-card animate-in delay-${Math.min(i+2, 4)}" onclick="window.toggleCard(this)">
+                            <div class="info-card animate-in delay-${Math.min(i+2, 4)}" onclick="window.toggleCard(this, '${card.audio || ''}', '${card.audioBehavior || 'interrupt'}')">
                                 <div class="card-inner">
                                     <div class="card-front">
                                         <i class="${card.icon || 'fas fa-shield-alt'}"></i>
@@ -766,6 +806,9 @@ window.finishPhishing = () => {
                             const anims = el.dataset.anim.split(' ');
                             anims.forEach(cls => el.classList.add(cls));
                         }
+                        if (el.dataset.audio) {
+                            playNarration(el.dataset.audio, el.dataset.audioBehavior || 'interrupt');
+                        }
                     });
                 });
             } else {
@@ -775,6 +818,9 @@ window.finishPhishing = () => {
                     if (el.dataset.anim) {
                         const anims = el.dataset.anim.split(' ');
                         anims.forEach(cls => el.classList.add(cls));
+                    }
+                    if (el.dataset.audio) {
+                        playNarration(el.dataset.audio, el.dataset.audioBehavior || 'interrupt');
                     }
                 });
             }
@@ -789,6 +835,21 @@ window.finishPhishing = () => {
             progressBar.style.width = `${((index + 1) / screens.length) * 100}%`;
             if (index === -1) progressBar.style.width = '0%';
             updateNav();
+
+            // --- Alert Audio Timers ---
+            if (screen.alerts) {
+                screen.alerts.forEach(alert => {
+                    if (alert.audio && !alert.waitForTyping) {
+                        const delayMilli = (alert.delay || 0) * 1000;
+                        setTimeout(() => {
+                            // Check if still on the same slide
+                            if (currentIndex === index) {
+                                playNarration(alert.audio, alert.audioBehavior || 'interrupt');
+                            }
+                        }, delayMilli);
+                    }
+                });
+            }
 
             // --- Locking Logic (minDelay & waitForAudio) ---
             const minDelay = screen.minDelay || 0;
@@ -926,9 +987,11 @@ window.finishPhishing = () => {
                 setTimeout(() => {
                     const status = `<span class="feedback-status info">כבר היינו בשאלה הזו</span>`;
                     const feedback = screen.question.feedback || "התשובה הנכונה מסומנת בירוק.";
+                    const feedbackAudio = screen.question.feedbackAudio || null;
+                    const feedbackBehavior = screen.question.feedbackAudioBehavior || 'interrupt';
                     const selOpt = screen.question.options[selectedIndex];
                     const selText = selOpt ? selOpt.text : "";
-                    showToast(screen.question.text || "", `${status}<br><br>${feedback}`, () => renderSlide(currentIndex + 1), null, selText);
+                    showToast(screen.question.text || "", `${status}<br><br>${feedback}`, () => renderSlide(currentIndex + 1), null, selText, feedbackAudio, feedbackBehavior);
                 }, 300);
             }
         }
@@ -962,11 +1025,11 @@ window.finishPhishing = () => {
 
             if (selectedIndex === correctIdx) {
                 score++;
-                showToast(questionText, `<span class="feedback-status correct">תשובה נכונה</span><br><br>כל הכבוד! נכון מאוד.`, () => renderSlide(currentIndex + 1), null, selText);
+                showToast(questionText, `<span class="feedback-status correct">תשובה נכונה</span><br><br>כל הכבוד! נכון מאוד.`, () => renderSlide(currentIndex + 1), null, selText, screen.question.feedbackAudio, screen.question.feedbackAudioBehavior);
                 document.getElementById('toast').classList.add('pulse-correct');
             } else {
                 const feedback = screen.question.feedback || "לא נורא, התשובה הנכונה מסומנת בירוק.";
-                showToast(questionText, `<span class="feedback-status incorrect">תשובה לא נכונה</span><br><br>${feedback}`, () => renderSlide(currentIndex + 1), null, selText);
+                showToast(questionText, `<span class="feedback-status incorrect">תשובה לא נכונה</span><br><br>${feedback}`, () => renderSlide(currentIndex + 1), null, selText, screen.question.feedbackAudio, screen.question.feedbackAudioBehavior);
                 document.getElementById('toast').classList.add('pulse-incorrect');
             }
             answeredCount++;
@@ -979,8 +1042,13 @@ window.finishPhishing = () => {
             saveState();
         }
 
-        function showToast(title, msg, onContinue = null, btnText = null, selectedAnswer = null) {
+        function showToast(title, msg, onContinue = null, btnText = null, selectedAnswer = null, audioPath = null, behavior = 'interrupt') {
             const t = document.getElementById('toast');
+            
+            // Play feedback audio if provided
+            if (audioPath) {
+                playNarration(audioPath, behavior);
+            }
             const isFinish = (title === "סיום לומדה" || title === "סיום הלומדה" || title === "סיכום לומדה");
             t.classList.toggle('finish-toast', isFinish);
             
