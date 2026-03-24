@@ -13,6 +13,12 @@ let selectedSlideIndex = -1;
 let selectedSlidesIndices = new Set();
 let supabaseClient = null;
 
+// Audio Editor State
+let wavesurfer = null;
+let wsRegions = null;
+let activeSelection = null;
+let audioUndoStack = []; // Stores { type: 'delete' / 'start' / 'end', oldVal: ... }
+
 // Initialize Supabase Client (Frontend)
 if (window.supabase) {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -627,6 +633,8 @@ function selectSlide(index) {
     }
     
     selectedSlideIndex = index;
+    activeSelection = null; // Clear any active selection when changing slides
+    audioUndoStack = []; // Reset undo stack on slide change
     const screen = currentCourseData.screens[index];
     
     if (!screen) return;
@@ -686,6 +694,217 @@ function selectSlide(index) {
     } else {
         officerCard.classList.add('hidden');
     }
+
+    // Audio Editor Initialization/Visibility
+    const audioEditorArea = document.getElementById('audio-editor-area');
+    const audioEditorEmpty = document.getElementById('audio-editor-empty');
+    const audioEditorContent = document.getElementById('audio-editor-content');
+    
+    // Hide editor on splash or if no slide selected
+    if (selectedSlideIndex === -100 || selectedSlideIndex === -1) {
+        if (audioEditorArea) audioEditorArea.classList.add('hidden');
+    } else {
+        if (audioEditorArea) audioEditorArea.classList.remove('hidden');
+        if (screen.audio && audioRelPathToUrl(screen.audio)) {
+            if (audioEditorEmpty) audioEditorEmpty.classList.add('hidden');
+            if (audioEditorContent) audioEditorContent.classList.remove('hidden');
+            setupAudioEditor(screen);
+        } else {
+            if (audioEditorEmpty) audioEditorEmpty.classList.remove('hidden');
+            if (audioEditorContent) audioEditorContent.classList.add('hidden');
+        }
+    }
+}
+
+function audioRelPathToUrl(relPath) {
+    if (!relPath) return null;
+    return getAssetUrl(relPath);
+}
+
+function setupAudioEditor(screen) {
+    const audioUrl = audioRelPathToUrl(screen.audio);
+    if (!audioUrl) return;
+
+    if (!wavesurfer) {
+        wavesurfer = WaveSurfer.create({
+            container: '#waveform',
+            waveColor: '#475569',
+            progressColor: '#38bdf8',
+            cursorColor: '#f87171',
+            height: 60,
+            barWidth: 2,
+            barGap: 3,
+            normalize: true,
+            responsive: true,
+            // WaveSurfer 7 uses plugins differently
+        });
+
+        wsRegions = wavesurfer.registerPlugin(WaveSurfer.Regions.create());
+
+        wsRegions.enableDragSelection({
+            color: 'rgba(56, 189, 248, 0.3)',
+            minLength: 0.1
+        });
+
+        const updateActiveSelection = (region) => {
+            if (region.id.startsWith('stored-')) return;
+            
+            if (activeSelection && activeSelection !== region) {
+                activeSelection.remove();
+            }
+            activeSelection = region;
+            // Highlight the active selection
+            region.setOptions({ color: 'rgba(56, 189, 248, 0.5)' });
+        };
+
+        wsRegions.on('region-created', updateActiveSelection);
+        wsRegions.on('region-updated', updateActiveSelection);
+        
+        wsRegions.on('region-clicked', (region, e) => {
+            e.stopPropagation(); // Avoid jumping playhead when clicking a region
+            updateActiveSelection(region);
+        });
+
+        wavesurfer.on('timeupdate', (currentTime) => {
+            // 1. Check end time
+            const scr = currentCourseData.screens[selectedSlideIndex];
+            if (scr && scr.endTime && currentTime >= scr.endTime) {
+                wavesurfer.pause();
+                wavesurfer.setTime(scr.startTime || 0);
+            }
+
+            // 2. Check deleted ranges (skipping logic)
+            if (scr && scr.deletedRanges) {
+                for (const range of scr.deletedRanges) {
+                    if (currentTime >= range.start && currentTime < range.end) {
+                        wavesurfer.setTime(range.end);
+                        break;
+                    }
+                }
+            }
+        });
+
+        wavesurfer.on('ready', () => {
+            const currentDuration = wavesurfer.getDuration();
+            document.getElementById('audio-end-display').textContent = formatTime(currentDuration);
+            renderStoredRegions(currentCourseData.screens[selectedSlideIndex]);
+        });
+        
+        // --- Buttons ---
+        document.getElementById('audio-play-pause').onclick = () => {
+            if (!wavesurfer) return;
+            const scr = currentCourseData.screens[selectedSlideIndex];
+            const currentTime = wavesurfer.getCurrentTime();
+            
+            if (!wavesurfer.isPlaying()) {
+                // If we are before the start or after the end, jump to start
+                if (scr.startTime && currentTime < scr.startTime) {
+                    wavesurfer.setTime(scr.startTime);
+                } else if (scr.endTime && currentTime >= scr.endTime) {
+                    wavesurfer.setTime(scr.startTime || 0);
+                }
+            }
+            
+            wavesurfer.playPause();
+            const icon = document.getElementById('audio-play-pause').querySelector('i');
+            icon.className = wavesurfer.isPlaying() ? 'fas fa-pause' : 'fas fa-play';
+        };
+
+        document.getElementById('audio-set-start').onclick = () => {
+            const currentTime = wavesurfer.getCurrentTime();
+            const scr = currentCourseData.screens[selectedSlideIndex];
+            audioUndoStack.push({ type: 'start', oldVal: scr.startTime });
+            scr.startTime = currentTime;
+            document.getElementById('audio-start-display').textContent = formatTime(currentTime);
+            showToast(`נקודת התחלה נקבעה ל-${formatTime(currentTime)}`);
+        };
+
+        document.getElementById('audio-set-end').onclick = () => {
+            const currentTime = wavesurfer.getCurrentTime();
+            const scr = currentCourseData.screens[selectedSlideIndex];
+            audioUndoStack.push({ type: 'end', oldVal: scr.endTime });
+            scr.endTime = currentTime;
+            document.getElementById('audio-end-display').textContent = formatTime(currentTime);
+            showToast(`נקודת סיום נקבעה ל-${formatTime(currentTime)}`);
+        };
+
+        document.getElementById('audio-delete-range').onclick = () => {
+            if (!activeSelection) {
+                showToast('יש לסמן קטע על הגל לפני מחיקה', 'info');
+                return;
+            }
+            const scr = currentCourseData.screens[selectedSlideIndex];
+            scr.deletedRanges = scr.deletedRanges || [];
+            audioUndoStack.push({ type: 'delete' });
+            scr.deletedRanges.push({
+                start: activeSelection.start,
+                end: activeSelection.end
+            });
+            activeSelection.remove();
+            activeSelection = null;
+            renderStoredRegions(scr);
+            showToast('הקטע סומן למחיקה מהניגון');
+        };
+
+        document.getElementById('audio-undo').onclick = async () => {
+            const scr = currentCourseData.screens[selectedSlideIndex];
+            if (audioUndoStack.length === 0) {
+                showToast('אין פעולות לביטול', 'info');
+                return;
+            }
+            
+            const action = audioUndoStack.pop();
+            if (action.type === 'delete') {
+                scr.deletedRanges.pop();
+            } else if (action.type === 'start') {
+                scr.startTime = action.oldVal;
+                document.getElementById('audio-start-display').textContent = formatTime(scr.startTime || 0);
+            } else if (action.type === 'end') {
+                scr.endTime = action.oldVal;
+                document.getElementById('audio-end-display').textContent = scr.endTime ? formatTime(scr.endTime) : '--:--';
+            }
+            
+            renderStoredRegions(scr);
+            await saveCourse();
+            showToast('הביטול בוצע בהצלחה!');
+        };
+    }
+
+    // Load URL and data
+    wavesurfer.load(audioUrl);
+    
+    // UI Values
+    document.getElementById('audio-start-display').textContent = formatTime(screen.startTime || 0);
+    document.getElementById('audio-end-display').textContent = screen.endTime ? formatTime(screen.endTime) : '--:--';
+    document.getElementById('audio-deleted-count').textContent = screen.deletedRanges ? screen.deletedRanges.length : '0';
+}
+
+function renderStoredRegions(screen) {
+    if (!wsRegions) return;
+    wsRegions.getRegions().forEach(r => r.remove());
+    
+    if (screen.deletedRanges) {
+        screen.deletedRanges.forEach(range => {
+            wsRegions.addRegion({
+                id: 'stored-deleted-' + Math.random(),
+                start: range.start,
+                end: range.end,
+                color: 'rgba(239, 68, 68, 0.4)',
+                drag: false,
+                resize: false,
+                content: 'מחק'
+            });
+        });
+    }
+    
+    document.getElementById('audio-deleted-count').textContent = screen.deletedRanges ? screen.deletedRanges.length : '0';
+}
+
+function formatTime(seconds) {
+    if (isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 function selectSplash() {
@@ -938,9 +1157,6 @@ function updateCurrentSlideData() {
     // Preserve screen.type if it's already a 'phishing-test'
     // Do not touch screen.phishing state either to avoid bugs
 
-    // Alerts and Cards work in-place via the direct assignments in renderAlerts/renderCards
-    // so no explicit sync needed here unless we rebuild the arrays.
-
     // Logo (only for first slide)
     if (selectedSlideIndex === 0) {
         screen.logo = logoPath.value;
@@ -1077,6 +1293,7 @@ function getAssetUrl(pth) {
         'scene_content.png': 'bg_content.png',
         'new_scene_quiz.png': 'bg_quiz.png',
         'scene_quiz.png': 'bg_quiz.png',
+        'new_scene_question.png': 'bg_quiz.png',
         'new_scene_summary.png': 'bg_summary.png',
         'new_scene_congrats.png': 'bg_summary.png'
     };
@@ -1147,8 +1364,8 @@ window.showSlidePreview = async (index, isFull = false) => {
         const transparencyVal = parseInt(slideTransparency.value) || 90;
 
         previewFrame.innerHTML = `
-            <div class="course-mockup" style="background-image: url('${bgUrl}')">
-                <div class="background-overlay"></div>
+            <div class="course-mockup">
+                <div class="background-overlay" style="background-image: url('${bgUrl}')"></div>
                 <div class="content-area-mockup splash-mode" 
                      style="background: rgba(15, 23, 42, ${transparencyVal / 100}) !important; width: 75% !important; max-width: 900px !important; left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; text-align: center !important;">
                     <div class="splash-view-mockup" style="text-align: center; direction: rtl;">
@@ -1197,7 +1414,15 @@ window.showSlidePreview = async (index, isFull = false) => {
     const content = isEditingThisSlide ? slideContent.value : (screen.content || '');
     const bg = isEditingThisSlide ? slideBg.value : (screen.bgImage || '');
     const audio = isEditingThisSlide ? audioPath.value : (screen.audio || '');
-    const isQ = isEditingThisSlide ? isQuestion.checked : !!(screen.question && screen.question.text);
+    const lowerTitle = title.toLowerCase();
+    const lowerContent = content.toLowerCase();
+    const isQ = isEditingThisSlide ? isQuestion.checked : (
+        !!(screen.question && screen.question.text) || screen.type === 'phishing-test' || 
+        lowerTitle.includes('בוחן') || lowerTitle.includes('בדיק') || 
+        lowerTitle.includes('שאלה') || lowerTitle.includes('מבחן') ||
+        lowerContent.includes('שאלות') || lowerContent.includes('סיכום') ||
+        lowerTitle.includes('בואו נבדוק')
+    );
     const qText = isEditingThisSlide ? questionText.value : (screen.question ? screen.question.text : '');
 
     let bgUrl = getAssetUrl(bg);
@@ -1382,8 +1607,8 @@ window.showSlidePreview = async (index, isFull = false) => {
     const nextBtnText = isSplash ? 'התחל למידה <i class="fas fa-play" style="margin-right:8px;"></i>' : (isLast ? 'סיום לומדה' : 'המשך');
 
     previewFrame.innerHTML = `
-        <div class="course-mockup" style="background-image: url('${bgUrl}')">
-            <div class="background-overlay"></div>
+        <div class="course-mockup">
+            <div class="background-overlay" style="background-image: url('${bgUrl}')"></div>
             <div class="mockup-progress-container"><div class="mockup-progress-bar" style="width: ${progress}%"></div></div>
             
             <div class="mockup-character-section ${isSplash ? 'splash-char' : ''}" 
@@ -1471,10 +1696,37 @@ window.showSlidePreview = async (index, isFull = false) => {
         if (audioUrl && audioUrl.includes(SUPABASE_URL)) {
             previewAudio = new Audio(audioUrl);
             
+            const st = screen.startTime || 0;
+            const et = screen.endTime || 0;
+            const dr = screen.deletedRanges || [];
+
+            if (st > 0) previewAudio.currentTime = st;
+
+            previewAudio.ontimeupdate = () => {
+                const cur = previewAudio.currentTime;
+                if (et > 0 && cur >= et) {
+                    previewAudio.pause();
+                    previewAudio.currentTime = et;
+                    if (wAudio && !hasSubmittedAnswer && !aFinished) {
+                        aFinished = true;
+                        checkUnlockMockup();
+                    }
+                    return;
+                }
+                for (const r of dr) {
+                    if (cur >= r.start && cur < r.end) {
+                        previewAudio.currentTime = r.end;
+                        break;
+                    }
+                }
+            };
+
             if (wAudio && !hasSubmittedAnswer) {
                 previewAudio.onended = () => {
-                    aFinished = true;
-                    checkUnlockMockup();
+                    if (!aFinished) {
+                        aFinished = true;
+                        checkUnlockMockup();
+                    }
                 };
             }
 
@@ -1493,6 +1745,25 @@ window.showSlidePreview = async (index, isFull = false) => {
         }
     } else if (audioUrl && audioUrl.includes(SUPABASE_URL)) {
         previewAudio = new Audio(audioUrl);
+        
+        const st = screen.startTime || 0;
+        const et = screen.endTime || 0;
+        const dr = screen.deletedRanges || [];
+        if (st > 0) previewAudio.currentTime = st;
+        previewAudio.ontimeupdate = () => {
+            const cur = previewAudio.currentTime;
+            if (et > 0 && cur >= et) {
+                previewAudio.pause();
+                return;
+            }
+            for (const r of dr) {
+                if (cur >= r.start && cur < r.end) {
+                    previewAudio.currentTime = r.end;
+                    break;
+                }
+            }
+        };
+
         previewAudio.play().catch(e => console.log('Audio play failed:', e));
     }
 }
@@ -1689,7 +1960,16 @@ audioUpload.onchange = async (e) => {
         
         // Save immediately
         if (selectedSlideIndex !== -1 && selectedSlideIndex !== -100) {
-            currentCourseData.screens[selectedSlideIndex].audio = filePath;
+            const screen = currentCourseData.screens[selectedSlideIndex];
+            screen.audio = filePath;
+            
+            // Reset existing audio edits for the new file
+            screen.startTime = 0;
+            screen.endTime = 0;
+            screen.deletedRanges = [];
+            audioUndoStack = []; // Reset undo stack
+            
+            selectSlide(selectedSlideIndex); // This will refresh the editor area visibility and contents
         } else if (selectedSlideIndex === -100) {
             currentCourseData.splash.audio = filePath;
         }

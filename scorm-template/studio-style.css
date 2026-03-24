@@ -59,9 +59,6 @@ body::after {
 
 #player-container {
     background-color: var(--bg-dark);
-    background-size: cover;
-    background-repeat: no-repeat;
-    background-position: center;
     position: relative;
     overflow: hidden;
     box-shadow: 0 0 50px rgba(0,0,0,0.5);
@@ -287,8 +284,18 @@ h1:empty, p:empty, .question-text:empty { display: none !important; }
 .overlay {
     position: absolute;
     top: 0; left: 0; width: 100%; height: 100%;
-    background: linear-gradient(180deg, rgba(15, 23, 42, 0.1) 0%, rgba(15, 23, 42, 0.4) 100%);
     z-index: 1;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.overlay::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.1) 0%, rgba(15, 23, 42, 0.4) 100%);
+    pointer-events: none;
 }
 
 #progress-container {

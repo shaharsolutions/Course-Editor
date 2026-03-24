@@ -344,63 +344,107 @@ app.get('/api/course/:id/export', async (req, res) => {
         const exportedFiles = [];
         const coreFiles = ['index.html', 'data.json', 'data.js', 'scorm_api.js', 'studio-player.js', 'studio-style.css', 'imsmanifest.xml'];
 
-        // 1. Storage Files Gathering (Extract paths directly from course.data)
-        const allPathsSet = new Set();
-        const extractPaths = (obj) => {
-            if (typeof obj === 'string') {
-                if (obj.startsWith(courseId + '/')) {
-                    allPathsSet.add(obj.substring(courseId.length + 1));
-                }
-            } else if (Array.isArray(obj)) {
-                obj.forEach(extractPaths);
-            } else if (obj && typeof obj === 'object') {
-                Object.values(obj).forEach(extractPaths);
+        // 1. Storage Files Gathering (List ALL files in the course folder RECURSIVELY)
+        const listAllFiles = async (folder) => {
+            const { data, error } = await supabase.storage.from('course-assets').list(folder);
+            if (error) {
+                console.error(`[Backend] Export: List error for ${folder}:`, error.message);
+                return [];
             }
+            
+            let files = [];
+            for (const item of data) {
+                const fullPath = folder ? `${folder}/${item.name}` : item.name;
+                // item.id is usually null for folders, or we can check item.metadata
+                // A better way in Supabase: items without metadata are usually folders
+                if (!item.metadata) {
+                    const subFiles = await listAllFiles(fullPath);
+                    files = files.concat(subFiles);
+                } else {
+                    files.push(fullPath);
+                }
+            }
+            return files;
         };
-        extractPaths(course.data);
-        const allPaths = Array.from(allPathsSet);
-        
+
+        const allStorageFiles = await listAllFiles(courseId);
         const exportLog = [];
         exportLog.push(`[Export Log] Course ID: ${courseId}`);
-        exportLog.push(`[Export Log] Found ${allPaths.length} items in storage.`);
 
-        const downloadFile = async (filePath) => {
-            if (!filePath || filePath.endsWith('/')) return;
-            // Skip core files
-            if (coreFiles.includes(filePath.split('/').pop())) return;
+        // Set to track added files
+        const processedFiles = new Set();
+        
+        const downloadAndAddFile = async (fullPath) => {
+            if (processedFiles.has(fullPath)) return;
+            processedFiles.add(fullPath);
 
+            let relPath = fullPath;
+            // Strip ANY leading UUID/prefix to keep paths clean and matching data.json
+            const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+            if (uuidPattern.test(relPath)) {
+                relPath = relPath.replace(uuidPattern, '').replace(/^\/+/, '');
+            }
+            
             try {
-                const { data: fileData, error } = await supabase.storage.from('course-assets').download(`${courseId}/${filePath}`);
+                const { data: fileData, error } = await supabase.storage.from('course-assets').download(fullPath);
                 if (error) {
-                    exportLog.push(`[ERROR] Fail download ${filePath}: ${error.message}`);
-                    console.warn(`[Backend] Export fail ${filePath}:`, error.message);
+                    exportLog.push(`[ERROR] Fail download ${relPath} (from ${fullPath}): ${error.message}`);
+                    console.error(`[Backend] Export: Fail download ${relPath}:`, error.message);
                     return;
                 }
                 if (fileData) {
-                    // Keep the original relative path (e.g. 'logos/logo.png') in the ZIP
-                    // this ensures importing the ZIP back to the editor works seamlessly.
-                    const zipPath = filePath;
-                    archive.append(Buffer.from(await fileData.arrayBuffer()), { name: zipPath });
-                    exportedFiles.push(zipPath);
+                    archive.append(Buffer.from(await fileData.arrayBuffer()), { name: relPath });
+                    exportedFiles.push(relPath);
+                    console.log(`[Backend] Export: Added to ZIP: ${relPath}`);
                 }
             } catch (err) {
-                exportLog.push(`[ERROR] Error ${filePath}: ${err.message}`);
+                exportLog.push(`[ERROR] Error processing ${relPath}: ${err.message}`);
+                console.error(`[Backend] Export: Error processing ${relPath}:`, err.message);
             }
         };
 
-        // Download assets in batches
-        for (let i = 0; i < allPaths.length; i += 10) {
-            await Promise.all(allPaths.slice(i, i + 10).map(downloadFile));
+        // 1. Add all files physically in the course folder
+        if (allStorageFiles && allStorageFiles.length > 0) {
+            console.log(`[Backend] Export: Found ${allStorageFiles.length} files in folder for course ${courseId}`);
+            for (let i = 0; i < allStorageFiles.length; i += 10) {
+                await Promise.all(allStorageFiles.slice(i, i + 10).map(downloadAndAddFile));
+            }
+        }
+
+        // 2. Scan course data for any OTHER assets that might be global or in different folders
+        console.log('[Backend] Export: Scanning JSON for additional assets...');
+        const dataStr = JSON.stringify(course.data);
+        const assetRegex = /([a-zA-Z0-9._\-\/]+\.(?:png|jpg|jpeg|gif|mp3|wav|mp4|webm|ogg|json|js|css))/g;
+        const matches = dataStr.match(assetRegex) || [];
+        const uniqueMatches = [...new Set(matches)];
+
+        for (const match of uniqueMatches) {
+            // Clean match from 'course-assets/' prefix to get storage path
+            const cleanPath = match.replace(/^course-assets\//, '');
+            const filename = cleanPath.split('/').pop();
+            const systemAssets = ['maya_guide.png', 'mia_transparent_v4.png', 'bg_welcome.png', 'bg_content.png', 'bg_quiz.png', 'bg_summary.png', 'bg_canvas.png'];
+            
+            if (!systemAssets.includes(filename) && !processedFiles.has(cleanPath)) {
+                console.log(`[Backend] Export: Found referenced asset outside main list: ${cleanPath}`);
+                await downloadAndAddFile(cleanPath);
+            }
         }
         
         archive.append(exportLog.join('\n'), { name: 'export-log.txt' });
 
         // 2. data.json & data.js (Generated from database)
         let jsonStr = JSON.stringify(course.data, null, 2);
-        // Clean up paths: strip the course ID prefix (e.g. "GUID/logos/..." -> "logos/...")
-        const courseIdEscaped = courseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const guidRegex = new RegExp(`${courseIdEscaped}/`, 'g');
-        jsonStr = jsonStr.replace(guidRegex, '');
+        
+        // Clean up paths: Strip BOTH full Supabase URLs and the UUID prefixes
+        const STORAGE_URL_BASE = `${supabaseUrl}/storage/v1/object/public/course-assets/`;
+        // Strip the full storage URL base (with or without course ID)
+        jsonStr = jsonStr.replace(new RegExp(STORAGE_URL_BASE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '');
+        
+        // Strip UUIDs from the beginning of paths (including trailing slash)
+        // This handles both course-specific and global asset references
+        jsonStr = jsonStr.replace(/(?:^|["'])([a-f0-9-]{36})\//g, (match, p1) => {
+            return match.replace(p1 + '/', '');
+        });
         
         archive.append(jsonStr, { name: 'data.json' });
         archive.append(`window.courseData = ${jsonStr};`, { name: 'data.js' });
@@ -408,6 +452,7 @@ app.get('/api/course/:id/export', async (req, res) => {
 
         // 3. Template Files (Add these LAST so they overwrite any stray files from storage)
         const templateDir = path.join(__dirname, '../scorm-template');
+        console.log(`[Backend] Export: Using template from: ${templateDir}`);
         if (await fs.pathExists(templateDir)) {
             const files = await fs.readdir(templateDir);
             for (const file of files) {

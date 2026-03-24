@@ -91,22 +91,27 @@
         if (!path || path.startsWith('http') || path.startsWith('blob:') || path.startsWith('data:')) return path;
         
         let clean = path;
-        // Strip leading GUID/ UUID prefix if present
+
+        // --- NEW: Aggressive Prefix Cleaning ---
+        // Strip Supabase bucket name if present (e.g. 'course-assets/')
+        if (clean.startsWith('course-assets/')) clean = clean.substring(14);
+
+        // Strip leading GUID/ UUID prefix if present (36 characters + slash)
+        // This handles cases like '0503d9f3-.../logos/logo.png' -> 'logos/logo.png'
         if (clean.includes('/')) {
             const parts = clean.split('/');
-            if (parts[0].length > 15 && parts[0].includes('-')) {
+            // Pattern for UUID: 8-4-4-4-12 hex chars
+            const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (uuidPattern.test(parts[0])) {
                 clean = parts.slice(1).join('/');
             }
         }
         
         // --- Preview Mode Logic ---
-        // If we have a courseId in session storage, we're in the editor's preview.
-        // Files that are NOT system assets should be fetched from Supabase Storage.
         const previewCourseId = sessionStorage.getItem('previewCourseId');
-        const systemAssets = ['maya_guide.png', 'mia_transparent_v4.png', 'bg_welcome.png', 'bg_content.png', 'bg_quiz.png', 'bg_summary.png'];
+        const systemAssets = ['maya_guide.png', 'mia_transparent_v4.png', 'bg_welcome.png', 'bg_content.png', 'bg_quiz.png', 'bg_summary.png', 'bg_canvas.png'];
         const filename = clean.split('/').pop();
         
-        // --- Legacy Remapping (Map old system names to existing ones) ---
         const legacyMap = {
             'new_scene_welcome.png': 'bg_welcome.png',
             'scene_welcome.png': 'bg_welcome.png',
@@ -114,6 +119,7 @@
             'scene_content.png': 'bg_content.png',
             'new_scene_quiz.png': 'bg_quiz.png',
             'scene_quiz.png': 'bg_quiz.png',
+            'new_scene_question.png': 'bg_quiz.png',
             'new_scene_summary.png': 'bg_summary.png',
             'new_scene_congrats.png': 'bg_summary.png'
         };
@@ -121,16 +127,20 @@
 
         if (previewCourseId && !systemAssets.includes(cleanName)) {
             const SUPABASE_URL = 'https://iduyexkzivtnvrdsbwig.supabase.co';
-            return `${SUPABASE_URL}/storage/v1/object/public/course-assets/${previewCourseId}/${clean.replace(/\/+/g, '/').replace(/^\//, '')}`;
+            // In preview, we always go back to the source storage
+            return `${SUPABASE_URL}/storage/v1/object/public/course-assets/${previewCourseId}/${clean.replace(/^\/+/, '')}`;
         }
         
-        // Normal published mode OR system asset
-        // If it's a known system asset, it lives in the 'assets/' folder.
+        // Published mode
         if (systemAssets.includes(cleanName)) {
             return 'assets/' + cleanName;
         }
         
-        return clean.replace(/\/+/g, '/');
+        // Ensure no leading slash and normalize slashes
+        const relPath = clean.replace(/^\/+/, '').replace(/\/+/g, '/');
+        
+        console.log(`[StudioPlayer] Resolved asset path: ${path} -> ${relPath}`);
+        return relPath;
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -494,26 +504,37 @@ window.finishPhishing = () => {
             const lowerTitle = (screen.title || '').toLowerCase();
             const lowerContent = (screen.content || '').toLowerCase();
             const isQ = screen.question || screen.type === 'phishing-test' || 
-                        lowerTitle.includes('בוחן') || lowerTitle.includes('בדיק') || 
-                        lowerTitle.includes('שאלה') || lowerTitle.includes('מבחן') ||
-                        lowerContent.includes('שאלות') || lowerContent.includes('סיכום') ||
-                        lowerTitle.includes('בואו נבדוק');
+                        lowerTitle.includes('בוחן') || lowerTitle.includes('בדק') || 
+                        lowerTitle.includes('בדוק') || lowerTitle.includes('בדיק') ||
+                        lowerTitle.includes('שאלה') || lowerTitle.includes('מבחן') || 
+                        lowerTitle.includes('תרגיל') || lowerTitle.includes('תרגול') || 
+                        lowerTitle.includes('משימה') || lowerContent.includes('שאלות') || 
+                        lowerContent.includes('סיכום');
 
-            if (screen.bgImage && screen.bgImage !== 'none' && screen.bgImage !== '') {
-                const bgUrl = resolveAssetPath(screen.bgImage);
-                playerContainer.style.backgroundImage = `url('${encodeURI(bgUrl)}')`;
-                console.log(`[StudioPlayer] Setting background: ${bgUrl}`);
-            } else {
-                // Fallback to high-quality system backgrounds
+            const overlay = playerContainer.querySelector('.overlay');
+            const bgUrlRaw = (screen.bgImage && screen.bgImage !== 'none' && screen.bgImage !== '') ? resolveAssetPath(screen.bgImage) : null;
+            
+            let bgUrl = bgUrlRaw;
+            let isFallback = false;
+            if (!bgUrl) {
+                isFallback = true;
                 let fallbackBg = 'bg_content.png';
                 if (index === -1 || index === 0) fallbackBg = 'bg_welcome.png';
                 else if (isQ) fallbackBg = 'bg_quiz.png';
                 else if (index === (screens.length - 1)) fallbackBg = 'bg_summary.png';
-                
-                const bgUrl = resolveAssetPath(fallbackBg);
-                playerContainer.style.backgroundImage = `url('${encodeURI(bgUrl)}')`;
-                console.log(`[StudioPlayer] Using fallback background: ${fallbackBg}`);
+                bgUrl = resolveAssetPath(fallbackBg);
             }
+
+            // Dual application for maximum reliability
+            const bgStyle = `url("${bgUrl}")`;
+            if (overlay) {
+                overlay.style.backgroundImage = bgStyle;
+                console.log(`[StudioPlayer] Setting background ${isFallback ? '(fallback)' : ''} to: ${bgUrl} (overlay: ${overlay !== null})`);
+            }
+            playerContainer.style.backgroundImage = bgStyle;
+            playerContainer.style.backgroundSize = 'cover';
+            playerContainer.style.backgroundPosition = 'center';
+            playerContainer.style.backgroundRepeat = 'no-repeat';
 
             // Ensure Splash mode is applied correctly
             if (index === -1) {
@@ -812,23 +833,83 @@ window.finishPhishing = () => {
                 nextBtn.style.pointerEvents = 'none';
             }
 
-            // Audio
+            // Audio - Robust Initialization
             if (screen.audio) {
                 const audioUrl = resolveAssetPath(screen.audio);
-                currentAudio = new Audio(audioUrl);
+                const audio = new Audio();
+                currentAudio = audio; // Track globally for stopAllAudio
                 
-                if (waitForAudio && !isSubmitted) {
-                    currentAudio.onended = () => {
-                        audioFinished = true;
-                        checkUnlock();
-                    };
+                const startTime = screen.startTime || 0;
+                const endTime = screen.endTime || 0;
+                const deletedRanges = screen.deletedRanges || [];
+                
+                let startPos = startTime || 0;
+                // Pre-calculate start position based on deleted ranges
+                for (const range of deletedRanges) {
+                    if (startPos >= range.start && startPos < range.end) {
+                        startPos = range.end;
+                    }
                 }
 
-                currentAudio.play().catch(e => {
-                    console.warn('[StudioPlayer] Auto-play blocked or failed:', e);
-                    audioFinished = true;
-                    checkUnlock();
-                });
+                console.log(`[Audio] Initializing for screen: ${screen.id || index}. Target startPos: ${startPos}`);
+
+                audio.src = audioUrl;
+                audio.load();
+
+                audio.addEventListener('loadedmetadata', () => {
+                    if (startPos > 0) {
+                        console.log(`[Audio] Setting initial currentTime to ${startPos}`);
+                        audio.currentTime = startPos;
+                    }
+                }, { once: true });
+
+                const playAudio = () => {
+                    audio.play().then(() => {
+                        console.log(`[Audio] Playing. current: ${audio.currentTime}`);
+                    }).catch(e => {
+                        console.warn('[StudioPlayer] Play blocked or failed:', e);
+                        if (waitForAudio && !isSubmitted) {
+                             audioFinished = true;
+                             checkUnlock();
+                        }
+                    });
+                };
+
+                // Better to wait for canplay
+                audio.addEventListener('canplay', playAudio, { once: true });
+
+                audio.ontimeupdate = () => {
+                    const currentTime = audio.currentTime;
+                    
+                    // 1. Check end time
+                    if (endTime > 0 && currentTime >= endTime) {
+                        audio.pause();
+                        audio.currentTime = endTime;
+                        if (waitForAudio && !isSubmitted && !audioFinished) {
+                            audioFinished = true;
+                            checkUnlock();
+                        }
+                        return;
+                    }
+
+                    // 2. Check deleted ranges (skipping logic)
+                    for (const range of deletedRanges) {
+                        if (currentTime >= range.start && currentTime < range.end) {
+                            console.log(`[Audio] Skipping deleted range: ${range.start}-${range.end}`);
+                            audio.currentTime = range.end;
+                            break;
+                        }
+                    }
+                };
+
+                if (waitForAudio && !isSubmitted) {
+                    audio.onended = () => {
+                        if (!audioFinished) {
+                            audioFinished = true;
+                            checkUnlock();
+                        }
+                    };
+                }
             }
 
             if (minDelay > 0 && !isSubmitted) {
