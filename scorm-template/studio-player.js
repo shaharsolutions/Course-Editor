@@ -40,7 +40,16 @@
             }
             const na = new Audio(url);
             currentNarrationAudio = na;
-            na.play().catch(e => console.warn('[Narration] Play blocked:', e));
+            na.play().catch(e => {
+                console.warn('[Narration] Play blocked:', e);
+                const resume = () => {
+                    na.play().catch(() => {});
+                    document.removeEventListener('mousedown', resume);
+                    document.removeEventListener('keydown', resume);
+                };
+                document.addEventListener('mousedown', resume);
+                document.addEventListener('keydown', resume);
+            });
         };
 
         if (behavior === 'wait' && currentAudio && !currentAudio.paused && !currentAudio.ended) {
@@ -719,16 +728,16 @@ window.finishPhishing = () => {
                                     <div style="color: #9ca3af; font-size: 0.8rem;">היום, 09:14</div>
                                 </div>
                             </div>
-                            <div class="email-body" style="padding: 12px 20px; line-height: 1.5; color: #334155; pointer-events: auto;">
-                                <p style="margin-bottom: 12px; color: #334155;">שלום <span class="phishing-flag text-flag" onclick="window.handleFlagClick(this, 'greeting')" style="padding: 2px 4px; border-radius: 4px;">לקוח יקר</span>,</p>
-                                <p style="margin-bottom: 12px; color: #334155;">זיהינו פעילות חריגה בחשבון שלך ממכשיר לא מזוהה. מטעמי אבטחה, החשבון שלך הוגבל באופן זמני.</p>
-                                <p style="margin-bottom: 18px; color: #334155;">אנא הקלק על הקישור הבא לאימות זהותך. יש לבצע את הפעולה תוך 24 שעות, אחרת חשבונך יינעל לצמיתות:</p>
+                            <div class="email-body" style="padding: 12px 20px; line-height: 1.5; color: #111111; pointer-events: auto;">
+                                <p style="margin-bottom: 12px; color: #111111;">שלום <span class="phishing-flag text-flag" onclick="window.handleFlagClick(this, 'greeting')" style="padding: 2px 4px; border-radius: 4px;">לקוח יקר</span>,</p>
+                                <p style="margin-bottom: 12px; color: #111111;">זיהינו פעילות חריגה בחשבון שלך ממכשיר לא מזוהה. מטעמי אבטחה, החשבון שלך הוגבל באופן זמני.</p>
+                                <p style="margin-bottom: 18px; color: #111111;">אנא הקלק על הקישור הבא לאימות זהותך. יש לבצע את הפעולה תוך 24 שעות, אחרת חשבונך יינעל לצמיתות:</p>
                                 
                                 <div style="text-align: center; margin: 20px 0; position: relative;" title="http://paypa1-security-check.com/login-action.php">
                                     <span class="phishing-flag phishing-action-btn" onclick="window.handleFlagClick(this, 'link')" style="box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-size: 0.95rem; padding: 10px 25px; display: inline-block;">התחברות לאימות מהיר</span>
                                 </div>
                                 
-                                <p style="margin-bottom: 3px; color: #334155;">בברכה,</p>
+                                <p style="margin-bottom: 3px; color: #111111;">בברכה,</p>
                                 <p style="color: #6b7280; font-size: 0.85rem; margin-bottom: 0;">צוות התמיכה והאבטחה</p>
                             </div>
                         </div>
@@ -929,6 +938,28 @@ window.finishPhishing = () => {
                         console.log(`[Audio] Playing. current: ${audio.currentTime}`);
                     }).catch(e => {
                         console.warn('[StudioPlayer] Play blocked or failed:', e);
+                        
+                        // Add one-time listener to resume on interaction
+                        const resume = () => {
+                            audio.play().catch(() => {});
+                            document.removeEventListener('mousedown', resume);
+                            document.removeEventListener('keydown', resume);
+                            const hint = document.getElementById('autoplay-hint');
+                            if (hint) hint.remove();
+                        };
+                        document.addEventListener('mousedown', resume);
+                        document.addEventListener('keydown', resume);
+
+                        // Show a temporary hint if it's the first slide
+                        if (index === -1 && !document.getElementById('autoplay-hint')) {
+                            const hint = document.createElement('div');
+                            hint.id = 'autoplay-hint';
+                            hint.style.cssText = 'position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:rgba(15,23,42,0.9); color:#38bdf8; padding:12px 24px; border-radius:50px; border:1px solid #38bdf8; z-index:10000; font-weight:bold; cursor:pointer; box-shadow:0 0 20px rgba(56,189,248,0.3);';
+                            hint.innerHTML = '<i class="fas fa-volume-up" style="margin-left:8px;"></i> לחצו כאן להפעלת סאונד';
+                            hint.onclick = resume;
+                            document.body.appendChild(hint);
+                        }
+
                         if (waitForAudio && !isSubmitted) {
                              audioFinished = true;
                              checkUnlock();

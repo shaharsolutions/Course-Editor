@@ -732,11 +732,11 @@ p { color: var(--text-main); line-height: 1.7; font-size: 1.15rem; }
     padding: 30px 25px;
     line-height: 1.7;
     font-size: 1.05rem;
-    color: #334155 !important;
+    color: #111111 !important;
 }
 
 .email-body p {
-    color: #334155 !important;
+    color: #111111 !important;
 }
 
 /* Custom Scrollbar for Email Mockup to indicate scrolling is needed */
