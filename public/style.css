@@ -485,7 +485,7 @@ input:focus, textarea:focus, select:focus {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #334155;
+  background-color: #000000;
   transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -766,7 +766,7 @@ input:checked + .slider:before {
     cursor: pointer;
     padding: 6px 12px;
     border-radius: 20px;
-    background: #334155;
+    background: #000000;
     color: var(--text-muted);
     transition: all 0.2s;
 }
@@ -1236,11 +1236,11 @@ input:checked + .slider:before {
     padding: 30px 25px;
     line-height: 1.7;
     font-size: 1.05rem;
-    color: #334155 !important;
+    color: #000000 !important;
 }
 
 .email-body p {
-    color: #334155 !important;
+    color: #000000 !important;
 }
 
 /* Custom Scrollbar for Email Mockup */

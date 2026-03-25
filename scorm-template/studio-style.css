@@ -732,11 +732,11 @@ p { color: var(--text-main); line-height: 1.7; font-size: 1.15rem; }
     padding: 30px 25px;
     line-height: 1.7;
     font-size: 1.05rem;
-    color: #111111 !important;
+    color: #000000 !important;
 }
 
 .email-body p {
-    color: #111111 !important;
+    color: #000000 !important;
 }
 
 /* Custom Scrollbar for Email Mockup to indicate scrolling is needed */
@@ -866,7 +866,7 @@ p { color: var(--text-main); line-height: 1.7; font-size: 1.15rem; }
     visibility: visible !important;
 }
 
-#content-area.phishing-mode p {
+#content-area.phishing-mode p:not(.email-body p) {
     font-size: 1rem !important;
     margin-bottom: 12px !important;
     color: #e2e8f0 !important;

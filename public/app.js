@@ -1656,16 +1656,16 @@ window.showSlidePreview = async (index, isFull = false) => {
                             <div style="color: #9ca3af; font-size: 0.8rem;">היום, 09:14</div>
                         </div>
                     </div>
-                    <div class="email-body" style="flex: 1; overflow-y: auto; padding: 12px 20px; line-height: 1.5; color: #334155; pointer-events: auto;">
-                        <p style="margin-bottom: 12px; color: #334155;">שלום <span style="color:#ef4444; border-bottom:1px dashed #ef4444; padding: 2px 4px; border-radius: 4px;">לקוח יקר</span>,</p>
-                        <p style="margin-bottom: 12px; color: #334155;">זיהינו פעילות חריגה בחשבון שלך ממכשיר לא מזוהה. מטעמי אבטחה, החשבון שלך הוגבל באופן זמני.</p>
-                        <p style="margin-bottom: 18px; color: #334155;">אנא הקלק על הקישור הבא לאימות זהותך. יש לבצע את הפעולה תוך 24 שעות, אחרת חשבונך יינעל לצמיתות:</p>
+                    <div class="email-body" style="flex: 1; overflow-y: auto; padding: 12px 20px; line-height: 1.5; color: #000000; pointer-events: auto;">
+                        <p style="margin-bottom: 12px; color: #000000;">שלום <span style="color:#ef4444; border-bottom:1px dashed #ef4444; padding: 2px 4px; border-radius: 4px;">לקוח יקר</span>,</p>
+                        <p style="margin-bottom: 12px; color: #000000;">זיהינו פעילות חריגה בחשבון שלך ממכשיר לא מזוהה. מטעמי אבטחה, החשבון שלך הוגבל באופן זמני.</p>
+                        <p style="margin-bottom: 18px; color: #000000;">אנא הקלק על הקישור הבא לאימות זהותך. יש לבצע את הפעולה תוך 24 שעות, אחרת חשבונך יינעל לצמיתות:</p>
                         
                         <div style="text-align: center; margin: 20px 0; position: relative;">
                             <span class="phishing-action-btn" style="box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-size: 0.95rem; padding: 10px 25px; display: inline-block;">התחברות לאימות מהיר</span>
                         </div>
                         
-                        <p style="margin-bottom: 3px; color: #334155;">בברכה,</p>
+                        <p style="margin-bottom: 3px; color: #000000;">בברכה,</p>
                         <p style="color: #6b7280; font-size: 0.85rem; margin-bottom: 0;">צוות התמיכה והאבטחה</p>
                     </div>
                 </div>
