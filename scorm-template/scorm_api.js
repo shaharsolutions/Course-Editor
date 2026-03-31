@@ -45,11 +45,19 @@ var SCORM = {
     findAPI(win) {
         let attempts = 0;
         while (win) {
-            if (win.LMSInitialize) return win;
-            if (win.API && win.API.LMSInitialize) return win.API;
+            try {
+                if (win.LMSInitialize) return win;
+                if (win.API && win.API.LMSInitialize) return win.API;
+            } catch (e) {
+                console.warn("[SCORM] Security restriction accessing frame/window", e);
+            }
             
-            if (win === win.parent) break;
-            win = win.parent;
+            try {
+                if (win === win.parent) break;
+                win = win.parent;
+            } catch (e) {
+                break;
+            }
             attempts++;
             if (attempts > 10) break;
         }

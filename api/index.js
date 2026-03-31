@@ -404,6 +404,10 @@ app.get('/api/course/:id/export', async (req, res) => {
                     return;
                 }
                 if (fileData) {
+                    // Filter out system files from ZIP and manifest
+                    const filename = relPath.split('/').pop();
+                    if (filename.startsWith('.') || filename === 'Thumbs.db' || filename === '__MACOSX') return;
+                    
                     archive.append(Buffer.from(await fileData.arrayBuffer()), { name: relPath });
                     exportedFiles.push(relPath);
                     console.log(`[Backend] Export: Added to ZIP: ${relPath}`);
@@ -467,7 +471,8 @@ app.get('/api/course/:id/export', async (req, res) => {
         if (await fs.pathExists(templateDir)) {
             const files = await fs.readdir(templateDir);
             for (const file of files) {
-                if (file === 'imsmanifest.xml' || file === 'data.js') continue; 
+                // Filter junk and already handled files
+                if (file.startsWith('.') || file === 'imsmanifest.xml' || file === 'data.js' || file === 'data.json') continue; 
                 const fullPath = path.join(templateDir, file);
                 const stat = await fs.stat(fullPath);
                 if (stat.isFile()) {
@@ -475,21 +480,36 @@ app.get('/api/course/:id/export', async (req, res) => {
                     exportedFiles.push(file);
                 } else if (stat.isDirectory() && file === 'assets') {
                     // Recursive add assets
-                    archive.directory(fullPath, 'assets');
-                    const assetFiles = await fs.readdir(fullPath);
-                    assetFiles.forEach(f => exportedFiles.push(`assets/${f}`));
+                    const assets = await fs.readdir(fullPath);
+                    for (const f of assets) {
+                        if (f.startsWith('.')) continue;
+                        archive.file(path.join(fullPath, f), { name: `assets/${f}` });
+                        exportedFiles.push(`assets/${f}`);
+                    }
                 }
             }
         }
 
-        // 4. Manifest
+        // 4. Manifest (SCORM 1.2 Standard)
         const manifest = `<?xml version="1.0" encoding="UTF-8"?>
-<manifest identifier="Course_${Date.now()}" version="1.0" xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2" xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd http://www.imsglobal.org/xsd/imsmd_rootv1p2 imsmd_rootv1p2.xsd http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd">
-    <metadata><schema>ADL SCORM</schema><schemaversion>1.2</schemaversion></metadata>
-    <organizations default="ORG_1"><organization identifier="ORG_1"><title>${course.title}</title><item identifier="ITEM_1" identifierref="RES_1"><title>${course.title}</title></item></organization></organizations>
-    <resources><resource identifier="RES_1" type="webcontent" adlcp:scormtype="sco" href="index.html">
-        ${[...new Set(exportedFiles)].map(f => `<file href="${f}"/>`).join('\n        ')}
-    </resource></resources>
+<manifest identifier="Course_${courseId}" version="1.0" xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2" xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd http://www.imsglobal.org/xsd/imsmd_rootv1p2 imsmd_rootv1p2.xsd http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd">
+    <metadata>
+        <schema>ADL SCORM</schema>
+        <schemaversion>1.2</schemaversion>
+    </metadata>
+    <organizations default="ORG_1">
+        <organization identifier="ORG_1">
+            <title>${(course.title || 'Course').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</title>
+            <item identifier="ITEM_1" identifierref="RES_1">
+                <title>${(course.title || 'Course').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</title>
+            </item>
+        </organization>
+    </organizations>
+    <resources>
+        <resource identifier="RES_1" type="webcontent" adlcp:scormtype="sco" href="index.html">
+            ${[...new Set(exportedFiles)].filter(f => !f.startsWith('.')).map(f => `<file href="${f}"/>`).join('\n            ')}
+        </resource>
+    </resources>
 </manifest>`;
         archive.append(manifest, { name: 'imsmanifest.xml' });
         await archive.finalize();

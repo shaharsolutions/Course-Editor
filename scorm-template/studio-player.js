@@ -187,7 +187,7 @@
         return relPath;
     }
 
-    document.addEventListener('DOMContentLoaded', async () => {
+    const initPlayer = async () => {
         const playerContainer = document.getElementById('player-container');
         const contentArea = document.getElementById('content-area');
         const progressBar = document.getElementById('progress-bar');
@@ -1156,25 +1156,71 @@ window.finishPhishing = () => {
         }
 
         // --- Start Execution ---
-        const success = await loadData();
-        if (success) {
-            await preloadMedia();
+        try {
+            console.log('[StudioPlayer] Running main start loop');
+            const success = await loadData();
             
-            // Hide loading screen and show player
-            document.getElementById('loading-screen').style.display = 'none';
-            document.getElementById('player-container').style.display = 'block';
-            fitPlayer();
+            // Add a failsafe timeout to hide the loading screen if preloading hangs
+            const loadingTimeout = setTimeout(() => {
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen && loadingScreen.style.display !== 'none') {
+                    console.warn('[StudioPlayer] Preloading taking too long, forcing show');
+                    loadingScreen.style.display = 'none';
+                    const playerContainer = document.getElementById('player-container');
+                    if (playerContainer) playerContainer.style.display = 'block';
+                    fitPlayer();
+                }
+            }, 8000);
 
-            restoreState();
-            restoreState();
-            // Start course
-            if (splashData && !SCORM.getSuspendData()?.index) {
-                renderSlide(-1);
+            if (success) {
+                await preloadMedia();
+                clearTimeout(loadingTimeout);
+                
+                // Hide loading screen and show player
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) loadingScreen.style.display = 'none';
+                const playerContainer = document.getElementById('player-container');
+                if (playerContainer) playerContainer.style.display = 'block';
+                fitPlayer();
+
+                restoreState();
+                // Start course
+                const suspend = SCORM.getSuspendData ? SCORM.getSuspendData() : null;
+                if (splashData && (!suspend || suspend.index === undefined || suspend.index === -1)) {
+                    renderSlide(-1);
+                } else {
+                    renderSlide(currentIndex || 0);
+                }
+                if (prevBtn) prevBtn.onclick = () => { if (currentIndex > 0) renderSlide(currentIndex - 1); };
             } else {
-                renderSlide(currentIndex || 0);
+                console.error('[StudioPlayer] Course data could not be loaded');
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) loadingScreen.style.display = 'none';
+                const playerContainer = document.getElementById('player-container');
+                if (playerContainer) playerContainer.style.display = 'block';
+                fitPlayer();
             }
-            prevBtn.onclick = () => { if (currentIndex > 0) renderSlide(currentIndex - 1); };
+        } catch (err) {
+            console.error('[StudioPlayer] Fatal error in start loop:', err);
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) loadingScreen.style.display = 'none';
+            const playerContainer = document.getElementById('player-container');
+            if (playerContainer) playerContainer.style.display = 'block';
+            if (contentArea) {
+                contentArea.innerHTML = `
+                    <div style="color:#ef4444; padding:40px; text-align:center;">
+                        <h3>שגיאה פנימית בלומדה</h3>
+                        <p>אירעה תקלה בעת הפעלת המערכת.</p>
+                        <code style="display:block; margin-top:10px; font-size:0.8rem;">${err.message}</code>
+                    </div>`;
+            }
         }
+    };
 
-    });
+    // --- Start Execution ---
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        initPlayer();
+    } else {
+        document.addEventListener('DOMContentLoaded', initPlayer);
+    }
 })();

@@ -67,6 +67,10 @@ async function runExport() {
         }
 
         if (fileData) {
+            const filename = relPath.split('/').pop();
+            // Filter junk
+            if (filename.startsWith('.') || filename === 'Thumbs.db' || filename === '__MACOSX') return;
+
             archive.append(Buffer.from(await fileData.arrayBuffer()), { name: relPath });
             exportedFiles.push(relPath);
         }
@@ -125,10 +129,22 @@ async function runExport() {
     }
 
     const manifest = `<?xml version="1.0" encoding="UTF-8"?>
-<manifest identifier="Course_${Date.now()}" version="1.0" xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2">
+<manifest identifier="Course_${courseId}" version="1.0" xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2" xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd http://www.imsglobal.org/xsd/imsmd_rootv1p2 imsmd_rootv1p2.xsd http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd">
+    <metadata>
+        <schema>ADL SCORM</schema>
+        <schemaversion>1.2</schemaversion>
+    </metadata>
+    <organizations default="ORG_1">
+        <organization identifier="ORG_1">
+            <title>${(course.title || 'Course').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</title>
+            <item identifier="ITEM_1" identifierref="RES_1">
+                <title>${(course.title || 'Course').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</title>
+            </item>
+        </organization>
+    </organizations>
     <resources>
-        <resource identifier="RES_1" type="webcontent" adlcp:scormtype="sco" href="index.html" xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2">
-            ${[...new Set(exportedFiles)].map(f => `<file href="${f}"/>`).join('\n            ')}
+        <resource identifier="RES_1" type="webcontent" adlcp:scormtype="sco" href="index.html">
+            ${[...new Set(exportedFiles)].filter(f => !f.startsWith('.')).map(f => `<file href="${f}"/>`).join('\n            ')}
         </resource>
     </resources>
 </manifest>`;
