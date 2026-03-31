@@ -384,7 +384,17 @@ window.finishPhishing = () => {
         function updateNav() {
             const screen = (currentIndex === -1) ? splashData : screens[currentIndex];
             const isQ = !!(screen && screen.question);
+            const isPhishing = !!(screen && screen.type === 'phishing-test');
             const isSplash = (currentIndex === -1);
+
+            // Special Mode: Phishing Simulation
+            // Per User Request: The "Continue" button should not be clickable.
+            // Only the "Report" button inside the email mockup should advance the slide.
+            if (isPhishing) {
+                nextBtn.style.display = 'none';
+                prevBtn.style.display = 'none';
+                return;
+            }
 
             // Per User Request: If submitted (already answered), 
             // the Check Answer button should NEVER show. Next/Prev are allowed.
@@ -397,6 +407,7 @@ window.finishPhishing = () => {
             }
 
             // Normal Navigation Logic
+            nextBtn.style.display = 'flex';
             prevBtn.style.display = (currentIndex > 0 && !isSplash) ? 'flex' : 'none';
             
             if (isSplash) {
