@@ -128,35 +128,35 @@
                                 <label>תוכן השקף (HTML נתמך)</label>
                                 <textarea id="slide-content" rows="10" placeholder="כתוב כאן את תוכן השקף שלך..."></textarea>
                             </div>
+                        </div>
 
-                            <!-- Audio Editor Area (Hidden by default) -->
-                            <div id="audio-editor-area" style="margin-top: 20px; padding: 20px; background: rgba(15, 23, 42, 0.4); border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.2);">
-                                <h4 style="font-size: 0.9rem; margin-bottom: 12px; color: var(--primary); display: flex; align-items: center; gap: 8px;">
-                                    <i class="fas fa-scissors"></i> עריכת קובץ סאונד
-                                </h4>
+                        <!-- Audio Editor Area (Hidden by default) -->
+                        <div id="audio-editor-area" style="margin-top: 20px; padding: 20px; background: rgba(15, 23, 42, 0.4); border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.2);">
+                            <h4 style="font-size: 0.9rem; margin-bottom: 12px; color: var(--primary); display: flex; align-items: center; gap: 8px;">
+                                <i class="fas fa-scissors"></i> עריכת קובץ סאונד
+                            </h4>
+                            
+                            <div id="audio-editor-empty" class="hidden" style="text-align: center; padding: 20px; color: var(--text-dim);">
+                                <i class="fas fa-music" style="font-size: 1.5rem; margin-bottom: 10px; display: block; opacity: 0.5;"></i>
+                                לא הועלה קובץ סאונד
+                            </div>
+
+                            <div id="audio-editor-content" class="hidden">
+                                <p style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 15px;">סמן קטע על הגל כדי למחוק או קבע התחלה וסיום</p>
                                 
-                                <div id="audio-editor-empty" class="hidden" style="text-align: center; padding: 20px; color: var(--text-dim);">
-                                    <i class="fas fa-music" style="font-size: 1.5rem; margin-bottom: 10px; display: block; opacity: 0.5;"></i>
-                                    לא הועלה קובץ סאונד
+                                <div id="waveform" style="margin-bottom: 15px; background: rgba(0,0,0,0.2); border-radius: 6px; overflow: hidden;"></div>
+                                
+                                <div class="audio-controls" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                    <button id="audio-play-pause" class="small-btn primary-btn" title="נגן / השהה"><i class="fas fa-play"></i> Play / Pause</button>
+                                    <button id="audio-set-start" class="small-btn secondary-btn-outline" title="קבע תחילת ניגון"><i class="fas fa-step-backward"></i> Set Start</button>
+                                    <button id="audio-set-end" class="small-btn secondary-btn-outline" title="קבע סיום ניגון"><i class="fas fa-step-forward"></i> Set End</button>
+                                    <button id="audio-delete-range" class="small-btn danger-btn" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4);" title="מחק את הקטע המסומן מהניגון"><i class="fas fa-trash"></i> Delete Selection</button>
+                                    <button id="audio-undo" class="small-btn secondary-btn-outline" title="בטל פעולה אחרונה"><i class="fas fa-undo"></i> Undo</button>
                                 </div>
-
-                                <div id="audio-editor-content" class="hidden">
-                                    <p style="font-size: 0.8rem; color: var(--text-dim); margin-bottom: 15px;">סמן קטע על הגל כדי למחוק או קבע התחלה וסיום</p>
-                                    
-                                    <div id="waveform" style="margin-bottom: 15px; background: rgba(0,0,0,0.2); border-radius: 6px; overflow: hidden;"></div>
-                                    
-                                    <div class="audio-controls" style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                        <button id="audio-play-pause" class="small-btn primary-btn" title="נגן / השהה"><i class="fas fa-play"></i> Play / Pause</button>
-                                        <button id="audio-set-start" class="small-btn secondary-btn-outline" title="קבע תחילת ניגון"><i class="fas fa-step-backward"></i> Set Start</button>
-                                        <button id="audio-set-end" class="small-btn secondary-btn-outline" title="קבע סיום ניגון"><i class="fas fa-step-forward"></i> Set End</button>
-                                        <button id="audio-delete-range" class="small-btn danger-btn" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4);" title="מחק את הקטע המסומן מהניגון"><i class="fas fa-trash"></i> Delete Selection</button>
-                                        <button id="audio-undo" class="small-btn secondary-btn-outline" title="בטל פעולה אחרונה"><i class="fas fa-undo"></i> Undo</button>
-                                    </div>
-                                    <div id="audio-times" style="margin-top: 10px; font-size: 0.75rem; color: var(--text-dim); display: flex; gap: 15px; flex-wrap: wrap;">
-                                        <span>תחילת ניגון: <strong id="audio-start-display">0:00</strong></span>
-                                        <span>סוף ניגון: <strong id="audio-end-display">--:--</strong></span>
-                                        <span>קטעים שנמחקו: <strong id="audio-deleted-count" style="color: #f87171;">0</strong></span>
-                                    </div>
+                                <div id="audio-times" style="margin-top: 10px; font-size: 0.75rem; color: var(--text-dim); display: flex; gap: 15px; flex-wrap: wrap;">
+                                    <span>תחילת ניגון: <strong id="audio-start-display">0:00</strong></span>
+                                    <span>סוף ניגון: <strong id="audio-end-display">--:--</strong></span>
+                                    <span>קטעים שנמחקו: <strong id="audio-deleted-count" style="color: #f87171;">0</strong></span>
                                 </div>
                             </div>
                         </div>

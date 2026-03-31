@@ -1,7 +1,9 @@
 console.log('[App] Version: 3.0 - Robust ASCII Paths & Stability Fixes');
 
 // --- Configuration ---
-const API_BASE = '/api';
+const API_BASE = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') && window.location.port !== '3000'
+    ? 'http://localhost:3030/api'
+    : '/api';
 const SUPABASE_URL = 'https://iduyexkzivtnvrdsbwig.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkdXlleGt6aXZ0bnZyZHNid2lnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0NjYwMTYsImV4cCI6MjA4OTA0MjAxNn0.MhqZwvY7RiOBBqgBhRD-e-SqbI7NIf2vWxNuD5_6e48';
 const baseUrl = '/';
@@ -229,7 +231,15 @@ if (courseFileInput) {
         } catch (err) {
             console.error('[App] Upload failed:', err);
             showToast(`שגיאת העלאה: ${err.message}`, 'error');
-            uploadModal.classList.add('hidden');
+            // Show error in the modal instead of hiding it silently
+            uploadLoadingState.classList.add('hidden');
+            uploadSuccessState.classList.remove('hidden');
+            uploadSuccessState.innerHTML = `
+                <i class="fas fa-times-circle" style="font-size: 4rem; color: #ef4444; margin-bottom: 24px;"></i>
+                <h3 style="font-size: 1.8rem; margin-bottom: 12px; color: white;">שגיאה בסיום העלאה</h3>
+                <p style="color: var(--text-muted); margin-bottom: 30px; word-break: break-all;">${err.message}</p>
+                <button onclick="document.getElementById('upload-modal').classList.add('hidden')" class="secondary-btn-outline" style="width: 100%;">סגור</button>
+            `;
         } finally {
             courseFileInput.value = '';
         }
@@ -344,7 +354,6 @@ async function loadCourse(courseId) {
         console.log(`[App] Rendering ${currentCourseData.screens.length} screens`);
         renderSlidesList(currentCourseData.screens);
         
-        // Initialize Splash if not exists
         if (!currentCourseData.splash) {
             currentCourseData.splash = {
                 title: currentCourseData.name || currentCourseData.screens[0]?.title || 'ברוכים הבאים',
@@ -355,7 +364,11 @@ async function loadCourse(courseId) {
             };
         }
         
-        selectSplash();
+        if (currentCourseData.screens && currentCourseData.screens.length > 0) {
+            selectSlide(0);
+        } else {
+            selectSplash();
+        }
     } catch (err) {
         console.error('[App] Load course failed:', err);
         showToast('נכשל בטעינת נתוני הלומדה', 'error');
@@ -711,8 +724,8 @@ function selectSlide(index) {
     const audioEditorEmpty = document.getElementById('audio-editor-empty');
     const audioEditorContent = document.getElementById('audio-editor-content');
     
-    // Hide editor on splash or if no slide selected
-    if (selectedSlideIndex === -100 || selectedSlideIndex === -1) {
+    // Show editor on splash or if slide selected
+    if (selectedSlideIndex === -1) {
         if (audioEditorArea) audioEditorArea.classList.add('hidden');
     } else {
         if (audioEditorArea) audioEditorArea.classList.remove('hidden');
@@ -778,7 +791,7 @@ function setupAudioEditor(screen) {
 
         wavesurfer.on('timeupdate', (currentTime) => {
             // 1. Check end time
-            const scr = currentCourseData.screens[selectedSlideIndex];
+            const scr = (selectedSlideIndex === -100) ? currentCourseData.splash : currentCourseData.screens[selectedSlideIndex];
             if (scr && scr.endTime && currentTime >= scr.endTime) {
                 wavesurfer.pause();
                 wavesurfer.setTime(scr.startTime || 0);
@@ -798,13 +811,14 @@ function setupAudioEditor(screen) {
         wavesurfer.on('ready', () => {
             const currentDuration = wavesurfer.getDuration();
             document.getElementById('audio-end-display').textContent = formatTime(currentDuration);
-            renderStoredRegions(currentCourseData.screens[selectedSlideIndex]);
+            const scr = (selectedSlideIndex === -100) ? currentCourseData.splash : currentCourseData.screens[selectedSlideIndex];
+            renderStoredRegions(scr);
         });
         
         // --- Buttons ---
         document.getElementById('audio-play-pause').onclick = () => {
             if (!wavesurfer) return;
-            const scr = currentCourseData.screens[selectedSlideIndex];
+            const scr = (selectedSlideIndex === -100) ? currentCourseData.splash : currentCourseData.screens[selectedSlideIndex];
             const currentTime = wavesurfer.getCurrentTime();
             
             if (!wavesurfer.isPlaying()) {
@@ -823,7 +837,7 @@ function setupAudioEditor(screen) {
 
         document.getElementById('audio-set-start').onclick = () => {
             const currentTime = wavesurfer.getCurrentTime();
-            const scr = currentCourseData.screens[selectedSlideIndex];
+            const scr = (selectedSlideIndex === -100) ? currentCourseData.splash : currentCourseData.screens[selectedSlideIndex];
             audioUndoStack.push({ type: 'start', oldVal: scr.startTime });
             scr.startTime = currentTime;
             document.getElementById('audio-start-display').textContent = formatTime(currentTime);
@@ -832,7 +846,7 @@ function setupAudioEditor(screen) {
 
         document.getElementById('audio-set-end').onclick = () => {
             const currentTime = wavesurfer.getCurrentTime();
-            const scr = currentCourseData.screens[selectedSlideIndex];
+            const scr = (selectedSlideIndex === -100) ? currentCourseData.splash : currentCourseData.screens[selectedSlideIndex];
             audioUndoStack.push({ type: 'end', oldVal: scr.endTime });
             scr.endTime = currentTime;
             document.getElementById('audio-end-display').textContent = formatTime(currentTime);
@@ -844,7 +858,7 @@ function setupAudioEditor(screen) {
                 showToast('יש לסמן קטע על הגל לפני מחיקה', 'info');
                 return;
             }
-            const scr = currentCourseData.screens[selectedSlideIndex];
+            const scr = (selectedSlideIndex === -100) ? currentCourseData.splash : currentCourseData.screens[selectedSlideIndex];
             scr.deletedRanges = scr.deletedRanges || [];
             audioUndoStack.push({ type: 'delete' });
             scr.deletedRanges.push({
@@ -858,7 +872,7 @@ function setupAudioEditor(screen) {
         };
 
         document.getElementById('audio-undo').onclick = async () => {
-            const scr = currentCourseData.screens[selectedSlideIndex];
+            const scr = (selectedSlideIndex === -100) ? currentCourseData.splash : currentCourseData.screens[selectedSlideIndex];
             if (audioUndoStack.length === 0) {
                 showToast('אין פעולות לביטול', 'info');
                 return;
@@ -947,8 +961,8 @@ function selectSplash() {
     // Audio (Minimal for splash or none)
     audioPath.value = splash.audio || '';
     audioFilename.textContent = splash.audio ? splash.audio.split('/').pop() : 'לא נבחר קובץ';
-    waitForAudio.checked = false;
-    minDelay.value = 0;
+    waitForAudio.checked = !!splash.waitForAudio;
+    minDelay.value = splash.minDelay || 0;
     
     // Hide question/features fields
     isQuestion.checked = false;
@@ -978,6 +992,21 @@ function selectSplash() {
     logoBgTransparencyVal.textContent = `${alpha}%`;
     
     updateLogoPreview();
+
+    // Audio editor for splash
+    const audioEditorArea = document.getElementById('audio-editor-area');
+    const audioEditorEmpty = document.getElementById('audio-editor-empty');
+    const audioEditorContent = document.getElementById('audio-editor-content');
+
+    if (audioEditorArea) audioEditorArea.classList.remove('hidden');
+    if (splash.audio && audioRelPathToUrl(splash.audio)) {
+        if (audioEditorEmpty) audioEditorEmpty.classList.add('hidden');
+        if (audioEditorContent) audioEditorContent.classList.remove('hidden');
+        setupAudioEditor(splash);
+    } else {
+        if (audioEditorEmpty) audioEditorEmpty.classList.remove('hidden');
+        if (audioEditorContent) audioEditorContent.classList.add('hidden');
+    }
 }
 
 splashItem.onclick = selectSplash;
@@ -1182,6 +1211,9 @@ function updateCurrentSlideData() {
             splash.title = slideTitle.value;
         }
 
+        splash.waitForAudio = waitForAudio.checked;
+        splash.minDelay = parseInt(minDelay.value) || 0;
+
         splash.content = slideContent.value;
         splash.bgImage = slideBg.value;
         splash.logo = logoPath.value;
@@ -1190,6 +1222,7 @@ function updateCurrentSlideData() {
         splash.logoBgTransparency = parseInt(logoBgTransparency.value);
         splash.styles = splash.styles || {};
         splash.styles.transparency = parseInt(slideTransparency.value);
+        splash.audio = audioPath.value;
         
         return;
     }
@@ -2078,6 +2111,14 @@ audioUpload.onchange = async (e) => {
             selectSlide(selectedSlideIndex); // This will refresh the editor area visibility and contents
         } else if (selectedSlideIndex === -100) {
             currentCourseData.splash.audio = filePath;
+            
+            // Reset existing audio edits for the new file
+            currentCourseData.splash.startTime = 0;
+            currentCourseData.splash.endTime = 0;
+            currentCourseData.splash.deletedRanges = [];
+            audioUndoStack = []; // Reset undo stack
+            
+            selectSplash(); // Refresh the splash editor area
         }
         await saveCourse();
         

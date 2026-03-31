@@ -164,7 +164,8 @@ async function processLocalZip(zipPath, tempDir, dbId, baseName) {
     zip.extractAllTo(tempDir, true);
 
     let root = tempDir;
-    const sub = await fs.readdir(tempDir);
+    const subRaw = await fs.readdir(tempDir);
+    const sub = subRaw.filter(name => !name.includes('__MACOSX') && name !== '.DS_Store');
     // Find content root (handle nested folder in ZIP)
     if (sub.length === 1 && (await fs.stat(path.join(tempDir, sub[0]))).isDirectory()) {
         root = path.join(tempDir, sub[0]);
@@ -218,9 +219,19 @@ async function processLocalZip(zipPath, tempDir, dbId, baseName) {
 
     let courseData = { screens: [] };
     const dataJsonPath = path.join(root, 'data.json');
-    if (await fs.pathExists(dataJsonPath)) courseData = await fs.readJson(dataJsonPath);
+    if (await fs.pathExists(dataJsonPath)) {
+        try {
+            courseData = await fs.readJson(dataJsonPath);
+            if (!courseData || !Array.isArray(courseData.screens)) {
+                courseData = { screens: [] };
+            }
+        } catch (e) {
+            console.error('[Backend] Failed to parse data.json, using empty template:', e);
+            courseData = { screens: [] };
+        }
+    }
 
-    const HARDCODED_ORG_ID = "526d46ee-26ea-4b2f-9026-a579c64cccf2";
+    const HARDCODED_ORG_ID = "70814869-cc75-4801-8c29-2417fc1fc983"; // Updated valid Org ID
     const { error: dbError } = await supabase.from('courses').insert({
         id: dbId,
         org_id: HARDCODED_ORG_ID,
