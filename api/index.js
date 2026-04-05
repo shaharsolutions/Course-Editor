@@ -63,10 +63,15 @@ function getCleanEnv(name, fallback) {
 }
 
 const supabaseUrl = getCleanEnv('SUPABASE_URL', FALLBACK_URL);
-const supabaseKey = getCleanEnv('SUPABASE_ANON_KEY', FALLBACK_KEY);
+const supabaseAnonKey = getCleanEnv('SUPABASE_ANON_KEY', FALLBACK_KEY);
+const supabaseServiceKey = getCleanEnv('SUPABASE_SERVICE_ROLE_KEY', '');
+
+// Favor Service Role Key for backend operations if provided
+const supabaseKey = supabaseServiceKey || supabaseAnonKey;
 
 console.log('[Backend] Supabase URL resolved to:', supabaseUrl);
 console.log('[Backend] Supabase Key resolved (first 20 chars):', supabaseKey.substring(0, 20) + '...');
+console.log('[Backend] Using Service Role Key:', !!supabaseServiceKey);
 
 let supabase;
 try {
@@ -200,8 +205,12 @@ async function processLocalZip(zipPath, tempDir, dbId, baseName) {
                 const content = await fs.readFile(f);
                 const contentType = getMimeType(f);
                 
+                // Sanitize rel path: ensure it doesn't have leading slashes and use forward slashes
+                // Also handle non-ASCII characters by letting Supabase handle them or encoding them
+                const storagePath = `${dbId}/${rel.replace(/\\/g, '/')}`;
+                
                 // Supabase upload with explicit content type
-                const { error: upError } = await supabase.storage.from('course-assets').upload(`${dbId}/${rel}`, content, { 
+                const { error: upError } = await supabase.storage.from('course-assets').upload(storagePath, content, { 
                     upsert: true,
                     contentType: contentType
                 });

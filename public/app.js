@@ -174,37 +174,17 @@ if (courseFileInput) {
         uploadModal.classList.remove('hidden');
 
         try {
-            uploadStatus.textContent = 'מעלה קובץ ZIP לענן (עקיפת הגבלת נפח)...';
+            uploadStatus.textContent = 'מעלה ומעבד קובץ ZIP בשרת...';
             
-            // Sanitize filename for storage key (avoid Hebrew/spaces in S3 keys)
-            const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9_\-.]/g, '_');
-            const zipPath = `temp_uploads/${Date.now()}_${sanitizedFileName}`;
-            
-            // Upload directly to Supabase Storage from frontend
-            const { data: uploadData, error: uploadError } = await supabaseClient
-                .storage
-                .from('course-assets')
-                .upload(zipPath, file, {
-                    cacheControl: '3600',
-                    upsert: false
-                });
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('baseName', displayTitle);
 
-            if (uploadError) {
-                console.error('[App] Supabase Direct Upload Error:', uploadError);
-                throw new Error(`שגיאת העלאה לענן: ${uploadError.message}`);
-            }
-
-            uploadStatus.textContent = 'מעבד את הקובץ בשרת...';
-            
-            // Call the backend to process the ZIP already in storage
-            const processResponse = await fetch(`${API_BASE}/courses/process-zip`, {
+            // Use the more robust backend upload endpoint
+            const processResponse = await fetch(`${API_BASE}/upload`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    courseId: courseId, // This will be used as the new folder name
-                    baseName: displayTitle,
-                    zipPath: zipPath
-                })
+                // Fetch will automatically set content-type to multipart/form-data with boundary
+                body: formData
             });
 
             if (!processResponse.ok) {
@@ -1397,22 +1377,28 @@ function getAssetUrl(pth) {
 
     if (supabaseClient) {
         let filePath = pth;
+        // If the path already starts with the course ID, don't duplicate it
         if (filePath.startsWith(currentCourse + '/')) {
             filePath = filePath.substring(currentCourse.length + 1);
         }
+        // Construct the full path and normalize slashes
         const fullPath = `${currentCourse}/${filePath}`.replace(/\/+/g, '/').replace(/^\//, '');
         const { data } = supabaseClient.storage.from('course-assets').getPublicUrl(fullPath);
+        // Ensure the returned URL is valid
         return data.publicUrl;
     }
 
     // Manual fallback if client is not ready
-    const storageUrl = `${SUPABASE_URL}/storage/v1/object/public/course-assets/${currentCourse}/`;
+    const storageUrl = `${SUPABASE_URL.replace(/\/+$/, '')}/storage/v1/object/public/course-assets/`;
     let clean = pth;
-    if (currentCourse && clean.startsWith(currentCourse + '/')) {
+    if (clean.startsWith(currentCourse + '/')) {
         clean = clean.substring(currentCourse.length + 1);
     }
     clean = clean.replace(/\/+/g, '/').replace(/^\//, '');
-    return storageUrl + encodeURI(clean);
+    
+    // Add course ID prefix and encode parts to handle special characters
+    const finalPath = `${currentCourse}/${clean}`.split('/').map(segment => encodeURIComponent(segment)).join('/');
+    return storageUrl + finalPath;
 }
 
 // --- Preview Modal ---
